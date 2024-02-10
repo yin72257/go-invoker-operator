@@ -1,0 +1,29 @@
+apiVersion: executor.invoker.io/v1alpha1
+kind: Executor
+metadata:
+  labels:
+    app.kubernetes.io/name: executor
+    app.kubernetes.io/instance: executor-sample
+    app.kubernetes.io/part-of: go-executor-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: go-executor-operator
+  name: executor-sample
+  namespace: default
+spec:
+  config: 
+    brokerIp: "192.168.1.9"
+    brokerPort: "9092"
+  image: "ruohang/executor:testv1"
+  imagePullPolicy: "IfNotPresent"
+  replicas: 1
+  resource:
+    claims:
+    - name: cpu
+    - name: memory
+    limits:
+      cpu: 1
+      memory: "1Gi"
+    requests:
+      cpu: 500m
+      memory: "512Mi"
+  version: "testv1"
