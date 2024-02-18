@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -48,7 +49,8 @@ const (
 // ExecutorReconciler reconciles a Executor object
 type ExecutorReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 type DesiredExecutorState struct {
@@ -74,12 +76,14 @@ type ExecutorHandler struct {
 //+kubebuilder:rbac:groups=executor.invoker.io,resources=executors/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;
+//+kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=controllerrevisions/status,verbs=get;
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=networking,resources=ingresses/status,verbs=get
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -101,6 +105,7 @@ func (r *ExecutorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		context:   ctx,
 		log:       log,
 		observed:  ObservedExecutorState{},
+		recorder:  r.Recorder,
 	}
 	return handler.reconcile(req, r.Scheme)
 }
@@ -174,7 +179,7 @@ func (handler *ExecutorHandler) reconcile(
 				return ctrl.Result{}, err
 			}
 
-			//TODO Finalize
+			handler.doFinalizeOperation()
 
 			if err = observer.observe(observed); err != nil {
 				log.Error(err, "Failed to re-fetch Executor")
@@ -282,4 +287,10 @@ func (handler *ExecutorHandler) reconcile(
 	}
 
 	return result, err
+}
+
+func (handler *ExecutorHandler) doFinalizeOperation() {
+	handler.recorder.Event(handler.observed.cr, "Warning", "Deleting", fmt.Sprintf("Custom Resource %s is being deleted from the namespace %s",
+		handler.request.Name,
+		handler.request.Namespace))
 }

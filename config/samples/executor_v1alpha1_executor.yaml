@@ -15,7 +15,7 @@ spec:
     brokerPort: "9092"
   image: "ruohang/executor:testv1"
   imagePullPolicy: "IfNotPresent"
-  replicas: 1
+  replicas: 3
   resource:
     claims:
     - name: cpu

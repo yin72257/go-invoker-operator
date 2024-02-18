@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/yin72257/go-executor-operator/api/v1alpha1"
 	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
+	controllermetrics "github.com/yin72257/go-executor-operator/internal/controller/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -152,6 +153,8 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	case v1alpha1.StateRunning,
 		v1alpha1.StateReconciling, v1alpha1.StateUpdating:
 		if isClusterStateUpdating {
+			log.Info("update metric : ApplicationUpgradeCounter")
+			controllermetrics.ApplicationUpgradeCounter.Inc()
 			status.State = v1alpha1.StateUpdating
 		} else if runningComponents < totalComponents {
 			status.State = v1alpha1.StateReconciling
