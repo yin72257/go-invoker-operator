@@ -31,7 +31,6 @@ type ObservedExecutorState struct {
 	configMap          *corev1.ConfigMap
 	executorDeployment *appsv1.Deployment
 	secret             *corev1.Secret
-	savepointErr       error
 	observeTime        time.Time
 	entryService       *corev1.Service
 	ingress            *networkingv1.Ingress
@@ -142,12 +141,36 @@ func (observer *ExecutorStateObserver) observe(
 
 	observed.observeTime = time.Now()
 
+	var observedRevisions = new(appsv1.ControllerRevisionList)
+	err = observer.observeRevisions(observedRevisions)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Failed to get Revisions")
+			return err
+		}
+		log.Info("Observed Revisions", "state", "nil")
+		observedRevisions = nil
+	} else {
+		log.Info("Observed Revisions", "state", *observedRevisions)
+		for i := range observedRevisions.Items {
+			observed.revisions = append(observed.revisions, &observedRevisions.Items[i])
+		}
+	}
+
 	specBytes, err := json.Marshal(observed.cr.Spec)
 	if err != nil {
 		return err
 	}
 	revisionName := generateRevisionName(observed.cr.Name, specBytes)
 	observed.cr.Status.NextRevision = revisionName
+	return nil
+}
+
+func (observer *ExecutorStateObserver) observeRevisions(revisions *appsv1.ControllerRevisionList) error {
+	selector := client.MatchingLabels{"invoker.io/executor": observer.request.Name}
+	if err := observer.k8sClient.List(observer.context, revisions, client.InNamespace(observer.request.Namespace), selector); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -421,24 +421,19 @@ func (reconciler *ExecutorResourceReconciler) deleteIngress(
 }
 
 func (reconciler *ExecutorResourceReconciler) cleanupOldRevisions() error {
-	var revisions appsv1.ControllerRevisionList
-	selector := client.MatchingLabels{"invoker.io/executor": reconciler.observed.cr.Name}
-	if err := reconciler.k8sClient.List(reconciler.context, &revisions, client.InNamespace(reconciler.observed.cr.Namespace), selector); err != nil {
-		return err
-	}
-
-	if len(revisions.Items) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
+	revisions := reconciler.observed.revisions
+	if len(revisions) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
 		return nil // Nothing to do
 	}
 
-	sort.Slice(revisions.Items, func(i, j int) bool {
-		return revisions.Items[i].Revision < revisions.Items[j].Revision
+	sort.Slice(revisions, func(i, j int) bool {
+		return revisions[i].Revision < revisions[j].Revision
 	})
 
-	excess := len(revisions.Items) - int(*reconciler.observed.cr.Spec.HistoryLimit)
+	excess := len(revisions) - int(*reconciler.observed.cr.Spec.HistoryLimit)
 
-	for _, oldRevision := range revisions.Items[:excess] {
-		if err := reconciler.k8sClient.Delete(reconciler.context, &oldRevision); err != nil {
+	for _, oldRevision := range revisions[:excess] {
+		if err := reconciler.k8sClient.Delete(reconciler.context, oldRevision); err != nil {
 			return err
 		}
 	}

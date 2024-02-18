@@ -256,7 +256,7 @@ func timeToString(timestamp time.Time) string {
 
 func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorState) error {
 	if observed.cr.Status.CurrentRevision == "" {
-		return updater.createControllerRevision(observed, 0)
+		return updater.createControllerRevision(observed, 1)
 	}
 
 	var lastRevision appsv1.ControllerRevision
@@ -264,13 +264,14 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: currentRevisionName}, &lastRevision); err != nil {
 		return err
 	}
-	var lastSpec *invokerv1alpha1.Executor
+	var lastSpec *invokerv1alpha1.ExecutorSpec
 	if err := json.Unmarshal(lastRevision.Data.Raw, &lastSpec); err != nil {
 		return err
 	}
 
-	if !reflect.DeepEqual(observed.cr.Spec, lastSpec) {
-		return updater.createControllerRevision(observed, lastRevision.Revision+1)
+	if !reflect.DeepEqual(observed.cr.Spec, *lastSpec) {
+		log.Info("creating revision:", "observed cr", observed.cr.Spec, "revision cr", lastSpec)
+		return updater.createControllerRevision(observed, int(lastRevision.Revision)+1)
 	}
 	observed.cr.Status.NextRevision = currentRevisionName
 	var cluster = v1alpha1.Executor{}
@@ -279,25 +280,14 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 	return updater.k8sClient.Status().Update(updater.context, &cluster)
 }
 
-func (updater *ExecutorStatusUpdater) createControllerRevision(observed *ObservedExecutorState, revisionNum int64) error {
-
+func (updater *ExecutorStatusUpdater) createControllerRevision(observed *ObservedExecutorState, revisionNum int) error {
 	specBytes, err := json.Marshal(observed.cr.Spec)
 	if err != nil {
 		return err
 	}
 	revisionName := generateRevisionName(observed.cr.Name, specBytes)
 	observed.cr.Status.NextRevision = revisionName
-	var currentRevision appsv1.ControllerRevision
-	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: revisionName}, &currentRevision); err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	} else {
-		var cluster = v1alpha1.Executor{}
-		updater.observed.cr.DeepCopyInto(&cluster)
-		cluster.Status.NextRevision = revisionName
-		return updater.k8sClient.Status().Update(updater.context, &cluster)
-	}
+
 	revision := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      revisionName,
@@ -312,13 +302,25 @@ func (updater *ExecutorStatusUpdater) createControllerRevision(observed *Observe
 		Data: runtime.RawExtension{
 			Raw: specBytes,
 		},
-		Revision: revisionNum,
+		Revision: int64(revisionNum),
 	}
 
-	if err := updater.k8sClient.Create(updater.context, revision); err != nil {
-		updater.log.Error(err, "Failed to create revision", "currentRevision", observed.cr.Status.CurrentRevision)
-		return err
+	var currentRevision appsv1.ControllerRevision
+	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: revisionName}, &currentRevision); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		if err := updater.k8sClient.Create(updater.context, revision); err != nil {
+			updater.log.Error(err, "Failed to create revision", "currentRevision", observed.cr.Status.CurrentRevision)
+			return err
+		}
+	} else {
+		if err := updater.k8sClient.Update(updater.context, revision); err != nil {
+			updater.log.Error(err, "Failed to update revision", "currentRevision", observed.cr.Status.CurrentRevision)
+			return err
+		}
 	}
+
 	var cluster = v1alpha1.Executor{}
 	updater.observed.cr.DeepCopyInto(&cluster)
 	cluster.Status.NextRevision = revisionName
