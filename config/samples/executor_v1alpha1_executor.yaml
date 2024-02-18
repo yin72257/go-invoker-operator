@@ -27,4 +27,4 @@ spec:
       cpu: 500m
       memory: "512Mi"
   version: "testv1"
-  historyLimit: 10
+  historyLimit: 3

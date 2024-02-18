@@ -276,11 +276,8 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 		log.Info("creating revision:", "observed cr", observed.cr.Spec, "revision cr", lastSpec)
 		return updater.createControllerRevision(observed, int(lastRevision.Revision)+1)
 	}
-	observed.cr.Status.NextRevision = currentRevisionName
-	var cluster = v1alpha1.Executor{}
-	updater.observed.cr.DeepCopyInto(&cluster)
-	cluster.Status.NextRevision = currentRevisionName
-	return updater.k8sClient.Status().Update(updater.context, &cluster)
+
+	return nil
 }
 
 func (updater *ExecutorStatusUpdater) createControllerRevision(observed *ObservedExecutorState, revisionNum int) error {
@@ -327,5 +324,5 @@ func (updater *ExecutorStatusUpdater) createControllerRevision(observed *Observe
 	var cluster = v1alpha1.Executor{}
 	updater.observed.cr.DeepCopyInto(&cluster)
 	cluster.Status.NextRevision = revisionName
-	return updater.k8sClient.Status().Update(updater.context, &cluster)
+	return nil
 }
