@@ -31,6 +31,7 @@ const (
 const (
 	StateCreating    = "Creating"
 	StateRunning     = "Running"
+	StateUpdating    = "Updating"
 	StateReconciling = "Reconciling"
 	StateStopping    = "Stopping"
 	StateStopped     = "Stopped"
@@ -75,6 +76,9 @@ type ExecutorSpec struct {
 	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 
 	Config InvokerConfig `json:"config,omitempty"`
+
+	// +kubebuilder:validation:Minimum:=1
+	HistoryLimit *int32 `json:"historyLimit,omitempty"`
 }
 
 type ComponentsStatus struct {
@@ -100,6 +104,10 @@ type ExecutorStatus struct {
 	State string `json:"state"`
 
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	CurrentRevision string `json:"currentRevision"`
+
+	NextRevision string `json:"nextRevision"`
 }
 
 //+kubebuilder:object:root=true

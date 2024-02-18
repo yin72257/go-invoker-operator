@@ -3,11 +3,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/go-logr/logr"
+	"github.com/yin72257/go-executor-operator/api/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +65,15 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
+	var cluster = v1alpha1.Executor{}
+	reconciler.observed.cr.DeepCopyInto(&cluster)
+	cluster.Status.CurrentRevision = reconciler.observed.cr.Status.NextRevision
+	err = reconciler.k8sClient.Status().Update(reconciler.context, &cluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
+
 }
 
 func (reconciler *ExecutorResourceReconciler) reconcileExecutorDeployment() error {
@@ -84,6 +94,13 @@ func (reconciler *ExecutorResourceReconciler) reconcileDeployment(
 	}
 
 	if desiredDeployment != nil && observedDeployment != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredDeployment, "Deployment")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 		log.Info("Deployment already exists, no action")
 		return nil
 	}
@@ -179,6 +196,13 @@ func (reconciler *ExecutorResourceReconciler) reconcileEntryService() error {
 	}
 
 	if desiredEntryService != nil && observedEntryService != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredEntryService, "Entry Serivce")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 		reconciler.log.Info("Entry service already exists, no action")
 		return nil
 	}
@@ -232,6 +256,13 @@ func (reconciler *ExecutorResourceReconciler) reconcileConfigMap() error {
 	}
 
 	if desiredConfigMap != nil && observedConfigMap != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredConfigMap, "ConfigMap")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 		reconciler.log.Info("ConfigMap already exists, no action")
 		return nil
 	}
@@ -338,6 +369,13 @@ func (reconciler *ExecutorResourceReconciler) reconcileIngress() error {
 	}
 
 	if desiredIngress != nil && observedIngress != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredIngress, "Ingress")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 		reconciler.log.Info("Ingress already exists, no action")
 		return nil
 	}
@@ -380,4 +418,30 @@ func (reconciler *ExecutorResourceReconciler) deleteIngress(
 		log.Info("Ingress deleted")
 	}
 	return err
+}
+
+func (reconciler *ExecutorResourceReconciler) cleanupOldRevisions() error {
+	var revisions appsv1.ControllerRevisionList
+	selector := client.MatchingLabels{"invoker.io/executor": reconciler.observed.cr.Name}
+	if err := reconciler.k8sClient.List(reconciler.context, &revisions, client.InNamespace(reconciler.observed.cr.Namespace), selector); err != nil {
+		return err
+	}
+
+	if len(revisions.Items) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
+		return nil // Nothing to do
+	}
+
+	sort.Slice(revisions.Items, func(i, j int) bool {
+		return revisions.Items[i].Revision < revisions.Items[j].Revision
+	})
+
+	excess := len(revisions.Items) - int(*reconciler.observed.cr.Spec.HistoryLimit)
+
+	for _, oldRevision := range revisions.Items[:excess] {
+		if err := reconciler.k8sClient.Delete(reconciler.context, &oldRevision); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

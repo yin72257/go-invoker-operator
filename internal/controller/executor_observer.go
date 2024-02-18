@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -9,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,6 +60,9 @@ func (observer *ExecutorStateObserver) observe(
 	} else {
 		log.Info("Observed executor", "executor", *observedCR)
 		observed.cr = observedCR
+	}
+	if observed.cr == nil {
+		return nil
 	}
 
 	// Secret.
@@ -137,6 +142,12 @@ func (observer *ExecutorStateObserver) observe(
 
 	observed.observeTime = time.Now()
 
+	specBytes, err := json.Marshal(observed.cr.Spec)
+	if err != nil {
+		return err
+	}
+	revisionName := generateRevisionName(observed.cr.Name, specBytes)
+	observed.cr.Status.NextRevision = revisionName
 	return nil
 }
 

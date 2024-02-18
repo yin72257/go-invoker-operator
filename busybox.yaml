@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: busybox-pod
-  namespace: go-executor-operator-system
+  namespace: default
 spec:
   containers:
   - name: busybox-container

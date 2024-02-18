@@ -41,6 +41,10 @@ spec:
                   brokerPort:
                     type: string
                 type: object
+              historyLimit:
+                format: int32
+                minimum: 1
+                type: integer
               image:
                 description: Executor Container image
                 type: string
@@ -209,12 +213,18 @@ spec:
                   - type
                   type: object
                 type: array
+              currentRevision:
+                type: string
               lastUpdateTime:
+                type: string
+              nextRevision:
                 type: string
               state:
                 type: string
             required:
             - components
+            - currentRevision
+            - nextRevision
             - state
             type: object
         type: object

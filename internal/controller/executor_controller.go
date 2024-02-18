@@ -78,6 +78,8 @@ type ExecutorHandler struct {
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking,resources=ingresses/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -265,6 +267,15 @@ func (handler *ExecutorHandler) reconcile(
 	result, err := reconciler.reconcile()
 	if err != nil {
 		log.Error(err, "Failed to reconcile")
+	}
+	err = updater.syncRevisions(observed)
+	if err != nil {
+		log.Error(err, "Failed to sync revisions")
+		return ctrl.Result{}, err
+	}
+	err = reconciler.cleanupOldRevisions()
+	if err != nil {
+		log.Error(err, "Failed to cleanup old revisions")
 	}
 	if result.RequeueAfter > 0 {
 		log.Info("Requeue reconcile request", "after", result.RequeueAfter)

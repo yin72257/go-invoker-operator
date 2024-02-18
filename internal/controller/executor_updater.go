@@ -2,14 +2,19 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/yin72257/go-executor-operator/api/v1alpha1"
+	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -135,6 +140,7 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	} else if recorded.Components.Ingress != "" {
 		status.Components.Ingress = v1alpha1.ComponentStateDeleted
 	}
+	isClusterStateUpdating := observed.cr.Status.CurrentRevision != observed.cr.Status.NextRevision
 	// Derive the new cluster state.
 	switch recorded.State {
 	case "", v1alpha1.StateCreating:
@@ -144,8 +150,10 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 			status.State = v1alpha1.StateRunning
 		}
 	case v1alpha1.StateRunning,
-		v1alpha1.StateReconciling:
-		if runningComponents < totalComponents {
+		v1alpha1.StateReconciling, v1alpha1.StateUpdating:
+		if isClusterStateUpdating {
+			status.State = v1alpha1.StateUpdating
+		} else if runningComponents < totalComponents {
 			status.State = v1alpha1.StateReconciling
 		} else {
 			status.State = v1alpha1.StateRunning
@@ -156,6 +164,9 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	default:
 		panic(fmt.Sprintf("Unknown cluster state: %v", recorded.State))
 	}
+
+	status.CurrentRevision = observed.cr.Status.CurrentRevision
+	status.NextRevision = observed.cr.Status.NextRevision
 
 	return status
 }
@@ -241,4 +252,75 @@ func getDeploymentState(deployment *appsv1.Deployment) string {
 
 func timeToString(timestamp time.Time) string {
 	return timestamp.Format(time.RFC3339)
+}
+
+func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorState) error {
+	if observed.cr.Status.CurrentRevision == "" {
+		return updater.createControllerRevision(observed, 0)
+	}
+
+	var lastRevision appsv1.ControllerRevision
+	currentRevisionName := observed.cr.Status.CurrentRevision
+	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: currentRevisionName}, &lastRevision); err != nil {
+		return err
+	}
+	var lastSpec *invokerv1alpha1.Executor
+	if err := json.Unmarshal(lastRevision.Data.Raw, &lastSpec); err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(observed.cr.Spec, lastSpec) {
+		return updater.createControllerRevision(observed, lastRevision.Revision+1)
+	}
+	observed.cr.Status.NextRevision = currentRevisionName
+	var cluster = v1alpha1.Executor{}
+	updater.observed.cr.DeepCopyInto(&cluster)
+	cluster.Status.NextRevision = currentRevisionName
+	return updater.k8sClient.Status().Update(updater.context, &cluster)
+}
+
+func (updater *ExecutorStatusUpdater) createControllerRevision(observed *ObservedExecutorState, revisionNum int64) error {
+
+	specBytes, err := json.Marshal(observed.cr.Spec)
+	if err != nil {
+		return err
+	}
+	revisionName := generateRevisionName(observed.cr.Name, specBytes)
+	observed.cr.Status.NextRevision = revisionName
+	var currentRevision appsv1.ControllerRevision
+	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: revisionName}, &currentRevision); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		var cluster = v1alpha1.Executor{}
+		updater.observed.cr.DeepCopyInto(&cluster)
+		cluster.Status.NextRevision = revisionName
+		return updater.k8sClient.Status().Update(updater.context, &cluster)
+	}
+	revision := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      revisionName,
+			Namespace: observed.cr.Namespace,
+			Labels: map[string]string{
+				"invoker.io/executor": observed.cr.Name,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(observed.cr, observed.cr.GroupVersionKind()),
+			},
+		},
+		Data: runtime.RawExtension{
+			Raw: specBytes,
+		},
+		Revision: revisionNum,
+	}
+
+	if err := updater.k8sClient.Create(updater.context, revision); err != nil {
+		updater.log.Error(err, "Failed to create revision", "currentRevision", observed.cr.Status.CurrentRevision)
+		return err
+	}
+	var cluster = v1alpha1.Executor{}
+	updater.observed.cr.DeepCopyInto(&cluster)
+	cluster.Status.NextRevision = revisionName
+	return updater.k8sClient.Status().Update(updater.context, &cluster)
 }

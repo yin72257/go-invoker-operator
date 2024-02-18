@@ -41,8 +41,6 @@ func getDesiredConfigMap(
 
 	namespace := instance.ObjectMeta.Namespace
 	name := instance.ObjectMeta.Name
-	brokerPort := instance.Spec.Config.BrokerPort
-	brokerIp := instance.Spec.Config.BrokerIp
 	configMapName := getConfigMapName(name)
 	labels := labels(instance)
 	var configMap = &corev1.ConfigMap{
@@ -52,8 +50,7 @@ func getDesiredConfigMap(
 			Labels:    labels,
 		},
 		Data: map[string]string{
-			"brokerPort": *brokerPort,
-			"brokerIp":   *brokerIp,
+			"broker.address": address(instance),
 		},
 	}
 	controllerutil.SetControllerReference(instance, configMap, scheme)
@@ -63,6 +60,7 @@ func getDesiredConfigMap(
 func getDesiredDeployment(
 	instance *v1alpha1.Executor, scheme *runtime.Scheme) *appsv1.Deployment {
 	labels := labels(instance)
+	name := instance.ObjectMeta.Name
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -84,8 +82,15 @@ func getDesiredDeployment(
 							Image: *instance.Spec.Image,
 							Env: []corev1.EnvVar{
 								{
-									Name:  "KAFKA_BROKER",
-									Value: address(instance),
+									Name: "KAFKA_BROKER",
+									ValueFrom: &corev1.EnvVarSource{
+										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: getConfigMapName(name),
+											},
+											Key: "broker.address",
+										},
+									},
 								},
 							},
 							ImagePullPolicy: instance.Spec.ImagePullPolicy,

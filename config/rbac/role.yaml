@@ -90,3 +90,21 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - networking
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking
+  resources:
+  - ingresses/status
+  verbs:
+  - get
