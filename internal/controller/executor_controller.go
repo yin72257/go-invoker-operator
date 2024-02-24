@@ -54,7 +54,8 @@ type ExecutorReconciler struct {
 }
 
 type DesiredExecutorState struct {
-	ExecutorDeployment *appsv1.Deployment
+	StatefulSet        *appsv1.StatefulSet
+	StatefulSetService *v1.Service
 	EntryService       *v1.Service
 	ConfigMap          *v1.ConfigMap
 	Secret             *v1.Secret
@@ -76,6 +77,8 @@ type ExecutorHandler struct {
 //+kubebuilder:rbac:groups=executor.invoker.io,resources=executors/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;
 //+kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=controllerrevisions/status,verbs=get;
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
@@ -114,7 +117,7 @@ func (r *ExecutorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *ExecutorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&invokerv1alpha1.Executor{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&v1.Service{}).
 		Complete(r)
 }
@@ -239,10 +242,10 @@ func (handler *ExecutorHandler) reconcile(
 	} else {
 		log.Info("Desired state", "ConfigMap", "nil")
 	}
-	if desired.ExecutorDeployment != nil {
-		log.Info("Desired state", "Executor Deployment", *desired.ExecutorDeployment)
+	if desired.StatefulSet != nil {
+		log.Info("Desired state", "Executor StatefulSet", *desired.StatefulSet)
 	} else {
-		log.Info("Desired state", "Executor Deployment", "nil")
+		log.Info("Desired state", "Executor StatefulSet", "nil")
 	}
 	if desired.Secret != nil {
 		log.Info("Desired state", "Secret", *desired.Secret)

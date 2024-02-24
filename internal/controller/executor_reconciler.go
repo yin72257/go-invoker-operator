@@ -24,7 +24,6 @@ type ExecutorResourceReconciler struct {
 	log       logr.Logger
 	observed  ObservedExecutorState
 	desired   DesiredExecutorState
-	updater   ExecutorStatusUpdater
 }
 
 var requeueResult = ctrl.Result{RequeueAfter: 10 * time.Second, Requeue: true}
@@ -50,7 +49,12 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	err = reconciler.reconcileExecutorDeployment()
+	err = reconciler.reconcileStatefulSetService()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	err = reconciler.reconcileStatefulSet()
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -76,11 +80,65 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileExecutorDeployment() error {
-	return reconciler.reconcileDeployment(
-		"Executor",
-		reconciler.desired.ExecutorDeployment,
-		reconciler.observed.executorDeployment)
+func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet() error {
+	var desiredStatefulSet = reconciler.desired.StatefulSet
+	var observedStatefulSet = reconciler.observed.executorStatefulSet
+	var log = reconciler.log.WithValues("component", "executorStatefulSet")
+
+	if desiredStatefulSet != nil && observedStatefulSet == nil {
+		return reconciler.createStatefulSet(desiredStatefulSet, "executorStatefulSet")
+	}
+
+	if desiredStatefulSet != nil && observedStatefulSet != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredStatefulSet, "StatefulSet")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+		log.Info("Deployment already exists, no action")
+		return nil
+	}
+
+	if desiredStatefulSet == nil && observedStatefulSet != nil {
+		return reconciler.deleteStatefulSet(observedStatefulSet, "executorStatefulSet")
+	}
+
+	return nil
+}
+
+func (reconciler *ExecutorResourceReconciler) createStatefulSet(
+	statefulSet *appsv1.StatefulSet, component string) error {
+	var context = reconciler.context
+	var log = reconciler.log.WithValues("component", component)
+	var k8sClient = reconciler.k8sClient
+
+	log.Info("Creating StatefulSet", "StatefulSet", *statefulSet)
+	var err = k8sClient.Create(context, statefulSet)
+	if err != nil {
+		log.Error(err, "Failed to create StatefulSet")
+	} else {
+		log.Info("StatefulSet created")
+	}
+	return err
+}
+
+func (reconciler *ExecutorResourceReconciler) deleteStatefulSet(
+	statefulSet *appsv1.StatefulSet, component string) error {
+	var context = reconciler.context
+	var log = reconciler.log.WithValues("component", component)
+	var k8sClient = reconciler.k8sClient
+
+	log.Info("Deleting StatefulSet", "StatefulSet", statefulSet)
+	var err = k8sClient.Delete(context, statefulSet)
+	err = client.IgnoreNotFound(err)
+	if err != nil {
+		log.Error(err, "Failed to delete StatefulSet")
+	} else {
+		log.Info("StatefulSet deleted")
+	}
+	return err
 }
 
 func (reconciler *ExecutorResourceReconciler) reconcileDeployment(
@@ -187,28 +245,42 @@ func (reconciler *ExecutorResourceReconciler) deleteDeployment(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileEntryService() error {
-	var desiredEntryService = reconciler.desired.EntryService
-	var observedEntryService = reconciler.observed.entryService
+func (reconciler *ExecutorResourceReconciler) reconcileStatefulSetService() error {
+	return reconciler.reconcileService(
+		"StatefulSetService",
+		reconciler.desired.StatefulSetService,
+		reconciler.observed.statefulSetService)
+}
 
-	if desiredEntryService != nil && observedEntryService == nil {
-		return reconciler.createService(desiredEntryService, "Entry")
+func (reconciler *ExecutorResourceReconciler) reconcileEntryService() error {
+	return reconciler.reconcileService(
+		"EntryService",
+		reconciler.desired.EntryService,
+		reconciler.observed.entryService)
+}
+
+func (reconciler *ExecutorResourceReconciler) reconcileService(component string,
+	desiredService *corev1.Service,
+	observedService *corev1.Service) error {
+	var log = reconciler.log.WithValues("component", component)
+	if desiredService != nil && observedService == nil {
+		return reconciler.createService(desiredService, component)
 	}
 
-	if desiredEntryService != nil && observedEntryService != nil {
+	if desiredService != nil && observedService != nil {
 		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
-			err := reconciler.updateComponent(desiredEntryService, "Entry Serivce")
+			err := reconciler.updateComponent(desiredService, component)
 			if err != nil {
 				return err
 			}
 			return nil
 		}
-		reconciler.log.Info("Entry service already exists, no action")
+		log.Info("Service already exists, no action")
 		return nil
 	}
 
-	if desiredEntryService == nil && observedEntryService != nil {
-		return reconciler.deleteService(observedEntryService, "Entry")
+	if desiredService == nil && observedService != nil {
+		return reconciler.deleteService(observedService, component)
 	}
 
 	return nil

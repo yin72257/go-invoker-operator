@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/yin72257/go-executor-operator/api/v1alpha1"
-	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
 	controllermetrics "github.com/yin72257/go-executor-operator/internal/controller/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -102,16 +101,16 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 		status.Components.Secret = v1alpha1.ComponentStateDeleted
 	}
 
-	// Executor Deployment
-	var observedDeployment = observed.executorDeployment
-	if observedDeployment != nil {
-		status.Components.ExecutorDeployment = getDeploymentState(observedDeployment)
-		if status.Components.ExecutorDeployment == v1alpha1.ComponentStateReady {
+	// Executor StatefulSet
+	var observedStatefulSet = observed.executorStatefulSet
+	if observedStatefulSet != nil {
+		status.Components.StatefulSet = getStatefulSetState(observedStatefulSet)
+		if status.Components.StatefulSet == v1alpha1.ComponentStateReady {
 			runningComponents++
-			log.Info("Deployment Ready")
+			log.Info("StatefulSet Ready")
 		}
-	} else if recorded.Components.ExecutorDeployment != "" {
-		status.Components.ExecutorDeployment = v1alpha1.ComponentStateDeleted
+	} else if recorded.Components.StatefulSet != "" {
+		status.Components.StatefulSet = v1alpha1.ComponentStateDeleted
 	}
 
 	// Entry service.
@@ -206,13 +205,13 @@ func (updater *ExecutorStatusUpdater) isStatusChanged(
 			newStatus.Components.ConfigMap)
 		changed = true
 	}
-	if newStatus.Components.ExecutorDeployment !=
-		currentStatus.Components.ExecutorDeployment {
+	if newStatus.Components.StatefulSet !=
+		currentStatus.Components.StatefulSet {
 		updater.log.Info(
-			"Executor Deployment status changed",
-			"current", currentStatus.Components.ExecutorDeployment,
+			"Executor StatefulSet status changed",
+			"current", currentStatus.Components.StatefulSet,
 			"new",
-			newStatus.Components.ExecutorDeployment)
+			newStatus.Components.StatefulSet)
 		changed = true
 	}
 	if newStatus.Components.EntryService !=
@@ -253,6 +252,13 @@ func getDeploymentState(deployment *appsv1.Deployment) string {
 	return v1alpha1.ComponentStateNotReady
 }
 
+func getStatefulSetState(statefulSet *appsv1.StatefulSet) string {
+	if statefulSet.Status.ReadyReplicas >= *statefulSet.Spec.Replicas {
+		return v1alpha1.ComponentStateReady
+	}
+	return v1alpha1.ComponentStateNotReady
+}
+
 func timeToString(timestamp time.Time) string {
 	return timestamp.Format(time.RFC3339)
 }
@@ -267,7 +273,7 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: currentRevisionName}, &lastRevision); err != nil {
 		return err
 	}
-	var lastSpec *invokerv1alpha1.ExecutorSpec
+	var lastSpec *v1alpha1.ExecutorSpec
 	if err := json.Unmarshal(lastRevision.Data.Raw, &lastSpec); err != nil {
 		return err
 	}

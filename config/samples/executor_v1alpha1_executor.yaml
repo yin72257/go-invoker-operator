@@ -13,9 +13,10 @@ spec:
   config: 
     brokerIp: "192.168.1.9"
     brokerPort: "9092"
-  image: "ruohang/executor:testv1"
+    podToPodPort: 8081
+  image: "ruohang/executor:testv1.1"
   imagePullPolicy: "IfNotPresent"
-  replicas: 3
+  replicas: 4
   resource:
     claims:
     - name: cpu

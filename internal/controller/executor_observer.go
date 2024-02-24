@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ClusterStateObserver gets the observed state of the cluster.
+// ExecutorStateObserver gets the observed state of the cluster.
 type ExecutorStateObserver struct {
 	k8sClient client.Client
 	request   ctrl.Request
@@ -24,16 +24,17 @@ type ExecutorStateObserver struct {
 	log       logr.Logger
 }
 
-// ObservedClusterState holds observed state of a cluster.
+// ObservedExecutorState holds observed state of a cluster.
 type ObservedExecutorState struct {
-	cr                 *invokerv1alpha1.Executor
-	revisions          []*appsv1.ControllerRevision
-	configMap          *corev1.ConfigMap
-	executorDeployment *appsv1.Deployment
-	secret             *corev1.Secret
-	observeTime        time.Time
-	entryService       *corev1.Service
-	ingress            *networkingv1.Ingress
+	cr                  *invokerv1alpha1.Executor
+	revisions           []*appsv1.ControllerRevision
+	configMap           *corev1.ConfigMap
+	executorStatefulSet *appsv1.StatefulSet
+	secret              *corev1.Secret
+	observeTime         time.Time
+	entryService        *corev1.Service
+	statefulSetService  *corev1.Service
+	ingress             *networkingv1.Ingress
 }
 
 type ExecutorStatus struct {
@@ -46,7 +47,6 @@ func (observer *ExecutorStateObserver) observe(
 	var err error
 	var log = observer.log
 
-	// Cluster state.
 	var observedCR = new(invokerv1alpha1.Executor)
 	err = observer.observeSpec(observedCR)
 	if err != nil {
@@ -94,24 +94,24 @@ func (observer *ExecutorStateObserver) observe(
 		observed.configMap = observedConfigMap
 	}
 
-	// Executor Deployment.
-	var observedExecutorDeployment = new(appsv1.Deployment)
-	err = observer.observeExecutorsDeployment(observedExecutorDeployment)
+	// Executor StatefulSet.
+	var observedExecutorStatefulSet = new(appsv1.StatefulSet)
+	err = observer.observeExecutorStatefulSet(observedExecutorStatefulSet)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Executor Deployment")
+			log.Error(err, "Failed to get Executor StatefulSet")
 			return err
 		}
-		log.Info("Observed Executor Deployment", "state", "nil")
-		observedExecutorDeployment = nil
+		log.Info("Observed Executor StatefulSet", "state", "nil")
+		observedExecutorStatefulSet = nil
 	} else {
-		log.Info("Observed Executor Deployment", "state", *observedExecutorDeployment)
-		observed.executorDeployment = observedExecutorDeployment
+		log.Info("Observed Executor StatefulSet", "state", *observedExecutorStatefulSet)
+		observed.executorStatefulSet = observedExecutorStatefulSet
 	}
 
 	// Executor service.
 	var observedEntryService = new(corev1.Service)
-	err = observer.observeEntryService(observedEntryService)
+	err = observer.observeService(observedEntryService, getEntryServiceName(observer.request.Name))
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			log.Error(err, "Failed to get Entry service")
@@ -122,6 +122,21 @@ func (observer *ExecutorStateObserver) observe(
 	} else {
 		log.Info("Observed Entry service", "state", *observedEntryService)
 		observed.entryService = observedEntryService
+	}
+
+	// Executor stateful set service.
+	var observedStatefulSetService = new(corev1.Service)
+	err = observer.observeService(observedStatefulSetService, getStatefulSetName(observer.request.Name))
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Failed to get StatefulSet service")
+			return err
+		}
+		log.Info("Observed StatefulSet service", "state", "nil")
+		observedStatefulSetService = nil
+	} else {
+		log.Info("Observed StatefulSet service", "state", *observedStatefulSetService)
+		observed.statefulSetService = observedStatefulSetService
 	}
 
 	// Executor ingress.
@@ -207,12 +222,12 @@ func (observer *ExecutorStateObserver) observeSecret(
 		observedSecret)
 }
 
-func (observer *ExecutorStateObserver) observeExecutorsDeployment(
-	observedDeployment *appsv1.Deployment) error {
+func (observer *ExecutorStateObserver) observeExecutorStatefulSet(
+	observedStatefulSet *appsv1.StatefulSet) error {
 	var executorNamespace = observer.request.Namespace
 	var executorName = observer.request.Name
-	return observer.observeDeployment(
-		executorNamespace, executorName, "Executor", observedDeployment)
+	return observer.observeStatefulSet(
+		executorNamespace, executorName, "Executor", observedStatefulSet)
 }
 
 func (observer *ExecutorStateObserver) observeDeployment(
@@ -238,30 +253,52 @@ func (observer *ExecutorStateObserver) observeDeployment(
 	return err
 }
 
-func (observer *ExecutorStateObserver) observeEntryService(
-	observedService *corev1.Service) error {
-	var clusterNamespace = observer.request.Namespace
-	var clusterName = observer.request.Name
+func (observer *ExecutorStateObserver) observeStatefulSet(
+	namespace string,
+	name string,
+	component string,
+	observedStatefulSet *appsv1.StatefulSet) error {
+	var log = observer.log.WithValues("component", component)
+	var err = observer.k8sClient.Get(
+		observer.context,
+		types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		},
+		observedStatefulSet)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Failed to get StatefulSet")
+		} else {
+			log.Info("StatefulSet not found")
+		}
+	}
+	return err
+}
+
+func (observer *ExecutorStateObserver) observeService(
+	observedService *corev1.Service, serviceName string) error {
+	var namespace = observer.request.Namespace
 
 	return observer.k8sClient.Get(
 		observer.context,
 		types.NamespacedName{
-			Namespace: clusterNamespace,
-			Name:      getEntryServiceName(clusterName),
+			Namespace: namespace,
+			Name:      serviceName,
 		},
 		observedService)
 }
 
 func (observer *ExecutorStateObserver) observeIngress(
 	observedIngress *networkingv1.Ingress) error {
-	var clusterNamespace = observer.request.Namespace
-	var clusterName = observer.request.Name
+	var namespace = observer.request.Namespace
+	var name = observer.request.Name
 
 	return observer.k8sClient.Get(
 		observer.context,
 		types.NamespacedName{
-			Namespace: clusterNamespace,
-			Name:      getIngressName(clusterName),
+			Namespace: namespace,
+			Name:      getIngressName(name),
 		},
 		observedIngress)
 }

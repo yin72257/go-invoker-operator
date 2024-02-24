@@ -28,6 +28,10 @@ func getExecutorDeploymentName(name string) string {
 	return name + "-executor"
 }
 
+func getStatefulSetName(name string) string {
+	return name + "-statefulset"
+}
+
 func getEntryServiceName(name string) string {
 	return name + "-entry"
 }

@@ -38,8 +38,9 @@ const (
 )
 
 type InvokerConfig struct {
-	BrokerIp   *string `json:"brokerIp,omitempty"`
-	BrokerPort *string `json:"brokerPort,omitempty"`
+	BrokerIp     *string `json:"brokerIp,omitempty"`
+	BrokerPort   *string `json:"brokerPort,omitempty"`
+	PodToPodPort *int32  `json:"podToPodPort,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -84,7 +85,7 @@ type ExecutorSpec struct {
 type ComponentsStatus struct {
 	ConfigMap string `json:"configMap"`
 
-	ExecutorDeployment string `json:"executorDeployment"`
+	StatefulSet string `json:"statefulSet"`
 
 	EntryService string `json:"entryService"`
 

@@ -40,6 +40,9 @@ spec:
                     type: string
                   brokerPort:
                     type: string
+                  podToPodPort:
+                    format: int32
+                    type: integer
                 type: object
               historyLimit:
                 format: int32
@@ -131,18 +134,18 @@ spec:
                     type: string
                   entryService:
                     type: string
-                  executorDeployment:
-                    type: string
                   ingress:
                     type: string
                   secret:
                     type: string
+                  statefulSet:
+                    type: string
                 required:
                 - configMap
                 - entryService
-                - executorDeployment
                 - ingress
                 - secret
+                - statefulSet
                 type: object
               conditions:
                 description: Conditions of the instances
