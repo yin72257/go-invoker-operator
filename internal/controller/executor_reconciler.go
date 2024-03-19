@@ -44,29 +44,40 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	err = reconciler.reconcileConfigMap()
-	if err != nil {
-		return ctrl.Result{}, err
+	configMapDesired := make(map[string]bool)
+	for _, desiredConfigMap := range reconciler.desired.ConfigMaps {
+		observed := reconciler.observed.configMaps[desiredConfigMap.Name]
+		configMapDesired[desiredConfigMap.Name] = true
+		err = reconciler.reconcileConfigMap(desiredConfigMap, observed)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	for name, observedConfigMap := range reconciler.observed.configMaps {
+		if _, exist := configMapDesired[name]; !exist {
+			err = reconciler.reconcileConfigMap(nil, observedConfigMap)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
-	err = reconciler.reconcileStatefulSetService()
-	if err != nil {
-		return ctrl.Result{}, err
+	statefulEntityDesired := make(map[string]bool)
+	for _, desiredSE := range reconciler.desired.StatefulEntities {
+		observedSE := reconciler.observed.statefulEntities[desiredSE.Name]
+		statefulEntityDesired[desiredSE.Name] = true
+		err = reconciler.reconcileStatefulSet(desiredSE, observedSE)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
-
-	err = reconciler.reconcileStatefulSet()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = reconciler.reconcileEntryService()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	err = reconciler.reconcileIngress()
-	if err != nil {
-		return ctrl.Result{}, err
+	for name, observedSE := range reconciler.observed.statefulEntities {
+		if _, exist := statefulEntityDesired[name]; !exist {
+			err = reconciler.reconcileStatefulSet(nil, observedSE)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 
 	var cluster = v1alpha1.Executor{}
@@ -80,9 +91,7 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet() error {
-	var desiredStatefulSet = reconciler.desired.StatefulSet
-	var observedStatefulSet = reconciler.observed.executorStatefulSet
+func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet(desiredStatefulSet *appsv1.StatefulSet, observedStatefulSet *appsv1.StatefulSet) error {
 	var log = reconciler.log.WithValues("component", "executorStatefulSet")
 
 	if desiredStatefulSet != nil && observedStatefulSet == nil {
@@ -97,7 +106,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet() error {
 			}
 			return nil
 		}
-		log.Info("Deployment already exists, no action")
+		log.Info("Statefulset already exists, no action")
 		return nil
 	}
 
@@ -245,13 +254,6 @@ func (reconciler *ExecutorResourceReconciler) deleteDeployment(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileStatefulSetService() error {
-	return reconciler.reconcileService(
-		"StatefulSetService",
-		reconciler.desired.StatefulSetService,
-		reconciler.observed.statefulSetService)
-}
-
 func (reconciler *ExecutorResourceReconciler) reconcileEntryService() error {
 	return reconciler.reconcileService(
 		"EntryService",
@@ -319,10 +321,7 @@ func (reconciler *ExecutorResourceReconciler) deleteService(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileConfigMap() error {
-	var desiredConfigMap = reconciler.desired.ConfigMap
-	var observedConfigMap = reconciler.observed.configMap
-
+func (reconciler *ExecutorResourceReconciler) reconcileConfigMap(desiredConfigMap *corev1.ConfigMap, observedConfigMap *corev1.ConfigMap) error {
 	if desiredConfigMap != nil && observedConfigMap == nil {
 		return reconciler.createConfigMap(desiredConfigMap, "ConfigMap")
 	}
@@ -511,4 +510,66 @@ func (reconciler *ExecutorResourceReconciler) cleanupOldRevisions() error {
 	}
 
 	return nil
+}
+
+func (reconciler *ExecutorResourceReconciler) reconcilePod(
+	component string,
+	desiredPod *corev1.Pod,
+	observedPod *corev1.Pod) error {
+	var log = reconciler.log.WithValues("component", component)
+
+	if desiredPod != nil && observedPod == nil {
+		return reconciler.createPod(desiredPod, component)
+	}
+
+	if desiredPod != nil && observedPod != nil {
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+			err := reconciler.updateComponent(desiredPod, "Pod")
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+		log.Info("Pod already exists, no action")
+		return nil
+	}
+
+	if desiredPod == nil && observedPod != nil {
+		return reconciler.deletePod(observedPod, component)
+	}
+
+	return nil
+}
+
+func (reconciler *ExecutorResourceReconciler) createPod(
+	pod *corev1.Pod, component string) error {
+	var context = reconciler.context
+	var log = reconciler.log.WithValues("component", component)
+	var k8sClient = reconciler.k8sClient
+
+	log.Info("Creating Pod", "Pod", *pod)
+	var err = k8sClient.Create(context, pod)
+	if err != nil {
+		log.Error(err, "Failed to create Pod")
+	} else {
+		log.Info("Pod created")
+	}
+	return err
+}
+
+func (reconciler *ExecutorResourceReconciler) deletePod(
+	pod *corev1.Pod, component string) error {
+	var context = reconciler.context
+	var log = reconciler.log.WithValues("component", component)
+	var k8sClient = reconciler.k8sClient
+
+	log.Info("Deleting Pod", "Pod", pod)
+	var err = k8sClient.Delete(context, pod)
+	err = client.IgnoreNotFound(err)
+	if err != nil {
+		log.Error(err, "Failed to delete Pod")
+	} else {
+		log.Info("Pod deleted")
+	}
+	return err
 }

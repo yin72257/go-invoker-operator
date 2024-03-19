@@ -34,23 +34,10 @@ spec:
           spec:
             description: ExecutorSpec defines the desired state of Executor
             properties:
-              config:
-                properties:
-                  brokerIp:
-                    type: string
-                  brokerPort:
-                    type: string
-                  podToPodPort:
-                    format: int32
-                    type: integer
-                type: object
               historyLimit:
                 format: int32
                 minimum: 1
                 type: integer
-              image:
-                description: Executor Container image
-                type: string
               imagePullPolicy:
                 description: 'Image pull policy: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy'
                 type: string
@@ -67,12 +54,6 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
-              replicas:
-                description: "Number of replicas of each shard to deploy for Executor
-                  deployment. \n Default: 1"
-                format: int32
-                minimum: 1
-                type: integer
               resource:
                 description: Configuration used for executor
                 properties:
@@ -121,6 +102,38 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+              statefulEntities:
+                items:
+                  properties:
+                    brokerIp:
+                      type: string
+                    image:
+                      type: string
+                    inputSidecar:
+                      type: string
+                    inputTopic:
+                      type: string
+                    name:
+                      type: string
+                    outputSidecar:
+                      type: string
+                    outputTopic:
+                      type: string
+                    stateSidecar:
+                      type: string
+                    topology:
+                      description: 'Default: 1'
+                      items:
+                        properties:
+                          partitions:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      minItems: 1
+                      type: array
+                  type: object
+                type: array
               version:
                 description: Version of Executor being deployed
                 type: string

@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/yin72257/go-executor-operator/api/v1alpha1"
@@ -27,34 +28,48 @@ func getDesiredClusterState(
 		return DesiredExecutorState{}
 	}
 	return DesiredExecutorState{
-		ConfigMap:          getDesiredConfigMap(executor, scheme),
-		StatefulSet:        getDesiredStatefulSet(executor, scheme),
-		StatefulSetService: getDesiredStatefulSetService(executor, scheme),
-		Secret:             getDesiredSecret(executor, scheme),
-		EntryService:       getDesiredEntryService(executor, scheme),
-		Ingress:            getDesiredIngress(executor, scheme),
+		ConfigMaps:       getDesiredConfigMaps(executor, scheme),
+		Secret:           getDesiredSecret(executor, scheme),
+		EntryService:     getDesiredEntryService(executor, scheme),
+		Ingress:          getDesiredIngress(executor, scheme),
+		StatefulEntities: getDesiredStatefulEntities(executor, scheme),
 	}
 }
 
-func getDesiredConfigMap(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *corev1.ConfigMap {
-
-	namespace := instance.ObjectMeta.Namespace
-	name := instance.ObjectMeta.Name
-	configMapName := getConfigMapName(name)
+func getDesiredConfigMaps(
+	instance *v1alpha1.Executor, scheme *runtime.Scheme) []*corev1.ConfigMap {
 	labels := labels(instance)
-	var configMap = &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      configMapName,
-			Labels:    labels,
-		},
-		Data: map[string]string{
-			"broker.address": address(instance),
-		},
+	labels["type"] = "statefulEntity"
+	cmList := []*corev1.ConfigMap{}
+	namespace := instance.ObjectMeta.Namespace
+
+	for _, statefulEntity := range instance.Spec.StatefulEntities {
+		configMapName := getConfigMapName(*statefulEntity.Name)
+		data := map[string]string{
+			"main": fmt.Sprintf(`
+kafka.broker=%s
+input.topic=%s
+output.topic=%s
+`, *statefulEntity.BrokerIp, *statefulEntity.InputTopic, *statefulEntity.OutputTopic),
+		}
+		for index, podConfig := range statefulEntity.Topology {
+			key := fmt.Sprintf(`%s-%d.partitions`, *statefulEntity.Name, index)
+			value := strings.Join(podConfig.Partitions, ",")
+			data[key] = value
+		}
+
+		var configMap = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      configMapName,
+				Labels:    labels,
+			},
+			Data: data,
+		}
+		controllerutil.SetControllerReference(instance, configMap, scheme)
+		cmList = append(cmList, configMap)
 	}
-	controllerutil.SetControllerReference(instance, configMap, scheme)
-	return configMap
+	return cmList
 }
 
 func getDesiredDeployment(
@@ -67,7 +82,6 @@ func getDesiredDeployment(
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: instance.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -78,8 +92,7 @@ func getDesiredDeployment(
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "executor-pod",
-							Image: *instance.Spec.Image,
+							Name: "executor-pod",
 							Env: []corev1.EnvVar{
 								{
 									Name: "KAFKA_BROKER",
@@ -107,31 +120,6 @@ func getDesiredDeployment(
 	return dep
 }
 
-func getDesiredStatefulSetService(instance *v1alpha1.Executor, scheme *runtime.Scheme) *corev1.Service {
-	namespace := instance.ObjectMeta.Namespace
-	name := instance.ObjectMeta.Name
-	serviceName := getStatefulSetName(name)
-	labels := labels(instance)
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      serviceName,
-			Labels:    labels,
-		},
-		Spec: corev1.ServiceSpec{
-			ClusterIP: "None",
-			Selector:  labels,
-			Ports: []corev1.ServicePort{
-				{
-					Port: *instance.Spec.Config.PodToPodPort,
-				},
-			},
-		},
-	}
-	controllerutil.SetControllerReference(instance, service, scheme)
-	return service
-}
-
 func getDesiredSecret(
 	instance *v1alpha1.Executor, scheme *runtime.Scheme) *corev1.Secret {
 	dockerPassword := os.Getenv("PASSWORD")
@@ -150,7 +138,7 @@ func getDesiredSecret(
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getSecretName()[0].Name,
-			Namespace: instance.Name,
+			Namespace: instance.Namespace,
 		},
 		Type: corev1.SecretTypeDockerConfigJson,
 		Data: map[string][]byte{
@@ -242,7 +230,6 @@ func getDesiredStatefulSet(
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: instance.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -254,8 +241,7 @@ func getDesiredStatefulSet(
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "executor-pod",
-							Image: *instance.Spec.Image,
+							Name: "executor-pod",
 							Env: []corev1.EnvVar{
 								{
 									Name: "KAFKA_BROKER",
@@ -281,4 +267,111 @@ func getDesiredStatefulSet(
 
 	controllerutil.SetControllerReference(instance, statefulSet, scheme)
 	return statefulSet
+}
+
+func getDesiredStatefulEntities(instance *v1alpha1.Executor, scheme *runtime.Scheme) []*appsv1.StatefulSet {
+	labels := labels(instance)
+	labels["type"] = "statefulEntity"
+	seList := []*appsv1.StatefulSet{}
+
+	for _, statefulEntity := range instance.Spec.StatefulEntities {
+		replicas := int32(len(statefulEntity.Topology))
+		statefulSet := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      *statefulEntity.Name,
+				Namespace: instance.ObjectMeta.Namespace,
+				Labels:    labels,
+			},
+			Spec: appsv1.StatefulSetSpec{
+				ServiceName: "",
+				Replicas:    &replicas,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: labels,
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: labels,
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:            "executor-pod",
+								Image:           *statefulEntity.Image,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "config-volume",
+										MountPath: "/etc/config",
+									},
+								},
+							},
+							{
+								Name:            "input-sidecar",
+								Image:           *statefulEntity.InputSidecar,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Env: []corev1.EnvVar{
+									{
+										Name: "POD_NAME",
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: "metadata.name",
+											},
+										},
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "config-volume",
+										MountPath: "/etc/config",
+									},
+								},
+							},
+							{
+								Name:            "state-sidecar",
+								Image:           *statefulEntity.StateSidecar,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+							},
+							{
+								Name:            "producer-sidecar",
+								Image:           *statefulEntity.OutputSidecar,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Env: []corev1.EnvVar{
+									{
+										Name: "POD_NAME",
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: "metadata.name",
+											},
+										},
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "config-volume",
+										MountPath: "/etc/config",
+									},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "config-volume",
+								VolumeSource: corev1.VolumeSource{
+									ConfigMap: &corev1.ConfigMapVolumeSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: getConfigMapName(*statefulEntity.Name),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		controllerutil.SetControllerReference(instance, statefulSet, scheme)
+		seList = append(seList, statefulSet)
+
+	}
+	return seList
 }

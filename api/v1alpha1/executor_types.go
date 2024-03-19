@@ -37,10 +37,23 @@ const (
 	StateStopped     = "Stopped"
 )
 
-type InvokerConfig struct {
-	BrokerIp     *string `json:"brokerIp,omitempty"`
-	BrokerPort   *string `json:"brokerPort,omitempty"`
-	PodToPodPort *int32  `json:"podToPodPort,omitempty"`
+type PodConfig struct {
+	Partitions []string `json:"partitions,omitempty"`
+}
+
+type StatefulEntity struct {
+	BrokerIp      *string `json:"brokerIp,omitempty"`
+	Image         *string `json:"image,omitempty"`
+	InputSidecar  *string `json:"inputSidecar,omitempty"`
+	InputTopic    *string `json:"inputTopic,omitempty"`
+	StateSidecar  *string `json:"stateSidecar,omitempty"`
+	OutputSidecar *string `json:"outputSidecar,omitempty"`
+	OutputTopic   *string `json:"outputTopic,omitempty"`
+	Name          *string `json:"name,omitempty"`
+	// Default: 1
+	// +optional
+	// +kubebuilder:validation:MinItems:=1
+	Topology []PodConfig `json:"topology,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -50,17 +63,6 @@ type InvokerConfig struct {
 type ExecutorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	// Number of replicas of each shard to deploy for Executor deployment.
-	//
-	// Default: 1
-	// +optional
-	// +kubebuilder:validation:Minimum:=1
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Executor Container image
-	// +optional
-	Image *string `json:"image,omitempty"`
 
 	// Version of Executor being deployed
 	Version string `json:"version,omitempty"`
@@ -76,7 +78,7 @@ type ExecutorSpec struct {
 	// +optional
 	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 
-	Config InvokerConfig `json:"config,omitempty"`
+	StatefulEntities []StatefulEntity `json:"statefulEntities,omitempty"`
 
 	// +kubebuilder:validation:Minimum:=1
 	HistoryLimit *int32 `json:"historyLimit,omitempty"`

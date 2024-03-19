@@ -86,8 +86,8 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	var totalComponents = 3
 
 	// ConfigMap.
-	var observedConfigMap = observed.configMap
-	if observedConfigMap != nil {
+	var observedConfigMap = observed.configMaps
+	if len(observedConfigMap) != 0 {
 		status.Components.ConfigMap = v1alpha1.ComponentStateReady
 	} else if recorded.Components.ConfigMap != "" {
 		status.Components.ConfigMap = v1alpha1.ComponentStateDeleted
@@ -100,16 +100,21 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	} else if recorded.Components.Secret != "" {
 		status.Components.Secret = v1alpha1.ComponentStateDeleted
 	}
-
-	// Executor StatefulSet
-	var observedStatefulSet = observed.executorStatefulSet
-	if observedStatefulSet != nil {
-		status.Components.StatefulSet = getStatefulSetState(observedStatefulSet)
-		if status.Components.StatefulSet == v1alpha1.ComponentStateReady {
-			runningComponents++
-			log.Info("StatefulSet Ready")
+	// Executor StatefulEntities
+	var observedStatefulEntities = observed.statefulEntities
+	totalStatefulEntities := len(observedStatefulEntities)
+	runningSE := 0
+	for _, observedStatefulSet := range observedStatefulEntities {
+		if observedStatefulSet != nil && getStatefulSetState(observedStatefulSet) == v1alpha1.ComponentStateReady {
+			runningSE++
 		}
-	} else if recorded.Components.StatefulSet != "" {
+	}
+	if runningSE < totalStatefulEntities {
+		status.Components.StatefulSet = v1alpha1.ComponentStateNotReady
+	} else {
+		status.Components.StatefulSet = v1alpha1.ComponentStateReady
+	}
+	if len(observedStatefulEntities) == 0 && recorded.Components.StatefulSet != "" {
 		status.Components.StatefulSet = v1alpha1.ComponentStateDeleted
 	}
 

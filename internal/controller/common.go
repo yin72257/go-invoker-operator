@@ -16,10 +16,6 @@ func labels(instance *invokerv1alpha1.Executor) map[string]string {
 	}
 }
 
-func address(instance *invokerv1alpha1.Executor) string {
-	return *instance.Spec.Config.BrokerIp + ":" + *instance.Spec.Config.BrokerPort
-}
-
 func getConfigMapName(name string) string {
 	return name + "-configmap"
 }

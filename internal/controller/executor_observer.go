@@ -28,13 +28,14 @@ type ExecutorStateObserver struct {
 type ObservedExecutorState struct {
 	cr                  *invokerv1alpha1.Executor
 	revisions           []*appsv1.ControllerRevision
-	configMap           *corev1.ConfigMap
+	configMaps          map[string]*corev1.ConfigMap
 	executorStatefulSet *appsv1.StatefulSet
 	secret              *corev1.Secret
 	observeTime         time.Time
 	entryService        *corev1.Service
 	statefulSetService  *corev1.Service
 	ingress             *networkingv1.Ingress
+	statefulEntities    map[string]*appsv1.StatefulSet
 }
 
 type ExecutorStatus struct {
@@ -80,18 +81,21 @@ func (observer *ExecutorStateObserver) observe(
 	}
 
 	// ConfigMap.
-	var observedConfigMap = new(corev1.ConfigMap)
-	err = observer.observeConfigMap(observedConfigMap)
+	var observedConfigMaps = new(corev1.ConfigMapList)
+	err = observer.observeConfigMaps(observedConfigMaps)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			log.Error(err, "Failed to get configMap")
 			return err
 		}
-		log.Info("Observed configMap", "state", "nil")
-		observedConfigMap = nil
+		log.Info("Observed configMaps", "state", "nil")
+		observedConfigMaps = nil
 	} else {
-		log.Info("Observed configMap", "state", *observedConfigMap)
-		observed.configMap = observedConfigMap
+		observed.configMaps = make(map[string]*corev1.ConfigMap)
+		log.Info("Observed configMaps", "state", *observedConfigMaps)
+		for i := range observedConfigMaps.Items {
+			observed.configMaps[observedConfigMaps.Items[i].Name] = &observedConfigMaps.Items[i]
+		}
 	}
 
 	// Executor StatefulSet.
@@ -154,6 +158,24 @@ func (observer *ExecutorStateObserver) observe(
 		observed.ingress = observedIngress
 	}
 
+	// StatefulEntities
+	var observedStatefulEntities = new(appsv1.StatefulSetList)
+	err = observer.observeStatefulEntities(observedStatefulEntities)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Failed to get list SE")
+			return err
+		}
+		log.Info("Observed list SE", "state", "nil")
+		observedStatefulEntities = nil
+	} else {
+		log.Info("Observed SE", "state", *observedStatefulEntities)
+		observed.statefulEntities = make(map[string]*appsv1.StatefulSet)
+		for i := range observedStatefulEntities.Items {
+			observed.statefulEntities[observedStatefulEntities.Items[i].Name] = &observedStatefulEntities.Items[i]
+		}
+	}
+
 	observed.observeTime = time.Now()
 
 	var observedRevisions = new(appsv1.ControllerRevisionList)
@@ -195,18 +217,11 @@ func (observer *ExecutorStateObserver) observeSpec(
 		observer.context, observer.request.NamespacedName, executor)
 }
 
-func (observer *ExecutorStateObserver) observeConfigMap(
-	observedConfigMap *corev1.ConfigMap) error {
-	var clusterNamespace = observer.request.Namespace
-	var clusterName = observer.request.Name
-
-	return observer.k8sClient.Get(
-		observer.context,
-		types.NamespacedName{
-			Namespace: clusterNamespace,
-			Name:      getConfigMapName(clusterName),
-		},
-		observedConfigMap)
+func (observer *ExecutorStateObserver) observeConfigMaps(
+	observedConfigMaps *corev1.ConfigMapList) error {
+	var namespace = observer.request.Namespace
+	labelSelector := client.MatchingLabels{"type": "statefulEntity"}
+	return observer.k8sClient.List(observer.context, observedConfigMaps, labelSelector, client.InNamespace(namespace))
 }
 
 func (observer *ExecutorStateObserver) observeSecret(
@@ -301,4 +316,13 @@ func (observer *ExecutorStateObserver) observeIngress(
 			Name:      getIngressName(name),
 		},
 		observedIngress)
+}
+
+func (observer *ExecutorStateObserver) observeStatefulEntities(observedStatefulEntities *appsv1.StatefulSetList) error {
+	var namespace = observer.request.Namespace
+	labelSelector := client.MatchingLabels{"type": "statefulEntity"}
+	if err := observer.k8sClient.List(observer.context, observedStatefulEntities, labelSelector, client.InNamespace(namespace)); err != nil {
+		return err
+	}
+	return nil
 }

@@ -54,12 +54,11 @@ type ExecutorReconciler struct {
 }
 
 type DesiredExecutorState struct {
-	StatefulSet        *appsv1.StatefulSet
-	StatefulSetService *v1.Service
-	EntryService       *v1.Service
-	ConfigMap          *v1.ConfigMap
-	Secret             *v1.Secret
-	Ingress            *networkingv1.Ingress
+	EntryService     *v1.Service
+	ConfigMaps       []*v1.ConfigMap
+	Secret           *v1.Secret
+	Ingress          *networkingv1.Ingress
+	StatefulEntities []*appsv1.StatefulSet
 }
 
 type ExecutorHandler struct {
@@ -237,15 +236,10 @@ func (handler *ExecutorHandler) reconcile(
 
 	*desired = getDesiredClusterState(observed, time.Now(), scheme)
 
-	if desired.ConfigMap != nil {
-		log.Info("Desired state", "ConfigMap", *desired.ConfigMap)
+	if desired.ConfigMaps != nil {
+		log.Info("Desired state", "ConfigMap", desired.ConfigMaps)
 	} else {
 		log.Info("Desired state", "ConfigMap", "nil")
-	}
-	if desired.StatefulSet != nil {
-		log.Info("Desired state", "Executor StatefulSet", *desired.StatefulSet)
-	} else {
-		log.Info("Desired state", "Executor StatefulSet", "nil")
 	}
 	if desired.Secret != nil {
 		log.Info("Desired state", "Secret", *desired.Secret)
