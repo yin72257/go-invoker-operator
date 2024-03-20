@@ -2,13 +2,31 @@
 // TODO(user): Add simple overview of use/purpose
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+## Quick Setup
+This setup assumes you have a Kubernetes cluster set up with correct permissions and network that can reach public internet.
+
+1. Depending on your kubernetes CLI command, change in Makefile line 187 to `KUBECTL ?= {kubectl command}`.
+Eg. For Microk8s you may change it to `KUBECTL ?= microk8s kubectl`. 
+
+2. Run and ensure the operator deployment is running on the kubernetes cluster.
+```shell
+make deploy
+
+# wait for operator pods to be ready
+kubectl wait --for=condition=available deployment/invoker-operator-controller-manager
+```
+
+3. After the operator pods are running. Apply the custom resource yamls. The example is located in `config/samples`. 
+```
+kubectl apply -f config/samples/invokeroperator_v1alpha1_invokerdeployment.yaml
+``` 
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
-### Running on the cluster
+### Running on Kind
 1. Install Instances of Custom Resources:
 
 ```sh
