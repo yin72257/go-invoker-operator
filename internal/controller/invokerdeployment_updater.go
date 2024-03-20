@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/yin72257/go-executor-operator/api/v1alpha1"
-	controllermetrics "github.com/yin72257/go-executor-operator/internal/controller/metrics"
+	"github.com/yin72257/go-invoker-operator/api/v1alpha1"
+	controllermetrics "github.com/yin72257/go-invoker-operator/internal/controller/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,21 +18,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ExecutorStatusUpdater struct {
+type InvokerDeploymentStatusUpdater struct {
 	k8sClient client.Client
 	context   context.Context
 	log       logr.Logger
-	observed  ObservedExecutorState
+	observed  ObservedInvokerDeploymentState
 }
 
-func (updater *ExecutorStatusUpdater) updateCondition(condition *metav1.Condition) error {
-	var newStatus = v1alpha1.ExecutorStatus{}
+func (updater *InvokerDeploymentStatusUpdater) updateCondition(condition *metav1.Condition) error {
+	var newStatus = v1alpha1.InvokerDeploymentStatus{}
 	newStatus.DeepCopyInto(&updater.observed.cr.Status)
 	meta.SetStatusCondition(&newStatus.Conditions, *condition)
 	return updater.updateClusterStatus(newStatus)
 }
 
-func (updater *ExecutorStatusUpdater) updateStatusIfChanged() (
+func (updater *InvokerDeploymentStatusUpdater) updateStatusIfChanged() (
 	bool, error) {
 	if updater.observed.cr == nil {
 		updater.log.Info("The resource has been deleted, no status to update")
@@ -40,12 +40,12 @@ func (updater *ExecutorStatusUpdater) updateStatusIfChanged() (
 	}
 
 	// Current status recorded in the cluster's status field.
-	var oldStatus = v1alpha1.ExecutorStatus{}
+	var oldStatus = v1alpha1.InvokerDeploymentStatus{}
 	updater.observed.cr.Status.DeepCopyInto(&oldStatus)
 	oldStatus.LastUpdateTime = ""
 
 	// New status derived from the cluster's components.
-	var newStatus = updater.deriveExecutorStatus(
+	var newStatus = updater.deriveInvokerDeploymentStatus(
 		&updater.observed.cr.Status, &updater.observed)
 
 	// Compare
@@ -66,11 +66,11 @@ func (updater *ExecutorStatusUpdater) updateStatusIfChanged() (
 	return false, nil
 }
 
-func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
-	recorded *v1alpha1.ExecutorStatus,
-	observed *ObservedExecutorState) v1alpha1.ExecutorStatus {
+func (updater *InvokerDeploymentStatusUpdater) deriveInvokerDeploymentStatus(
+	recorded *v1alpha1.InvokerDeploymentStatus,
+	observed *ObservedInvokerDeploymentState) v1alpha1.InvokerDeploymentStatus {
 
-	var status = v1alpha1.ExecutorStatus{}
+	var status = v1alpha1.InvokerDeploymentStatus{}
 
 	if recorded.Conditions == nil || len(recorded.Conditions) == 0 {
 		meta.SetStatusCondition(&status.Conditions, metav1.Condition{
@@ -82,7 +82,7 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 		status.Conditions = recorded.Conditions
 	}
 	var runningComponents = 0
-	// executorDeployment, entryService.
+	// InvokerDeploymentDeployment, entryService.
 	var totalComponents = 3
 
 	// ConfigMap.
@@ -100,7 +100,7 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	} else if recorded.Components.Secret != "" {
 		status.Components.Secret = v1alpha1.ComponentStateDeleted
 	}
-	// Executor StatefulEntities
+	// InvokerDeployment StatefulEntities
 	var observedStatefulEntities = observed.statefulEntities
 	totalStatefulEntities := len(observedStatefulEntities)
 	runningSE := 0
@@ -178,14 +178,14 @@ func (updater *ExecutorStatusUpdater) deriveExecutorStatus(
 	return status
 }
 
-func (updater *ExecutorStatusUpdater) isStatusChanged(
-	currentStatus v1alpha1.ExecutorStatus,
-	newStatus v1alpha1.ExecutorStatus) bool {
+func (updater *InvokerDeploymentStatusUpdater) isStatusChanged(
+	currentStatus v1alpha1.InvokerDeploymentStatus,
+	newStatus v1alpha1.InvokerDeploymentStatus) bool {
 	var changed = false
 	if newStatus.State != currentStatus.State {
 		changed = true
 		updater.log.Info(
-			"Executor state changed",
+			"InvokerDeployment state changed",
 			"current",
 			currentStatus.State,
 			"new",
@@ -213,7 +213,7 @@ func (updater *ExecutorStatusUpdater) isStatusChanged(
 	if newStatus.Components.StatefulSet !=
 		currentStatus.Components.StatefulSet {
 		updater.log.Info(
-			"Executor StatefulSet status changed",
+			"InvokerDeployment StatefulSet status changed",
 			"current", currentStatus.Components.StatefulSet,
 			"new",
 			newStatus.Components.StatefulSet)
@@ -240,10 +240,10 @@ func (updater *ExecutorStatusUpdater) isStatusChanged(
 	return changed
 }
 
-func (updater *ExecutorStatusUpdater) updateClusterStatus(
-	status v1alpha1.ExecutorStatus) error {
+func (updater *InvokerDeploymentStatusUpdater) updateClusterStatus(
+	status v1alpha1.InvokerDeploymentStatus) error {
 	log.Info("Updating status")
-	var cluster = v1alpha1.Executor{}
+	var cluster = v1alpha1.InvokerDeployment{}
 	updater.observed.cr.DeepCopyInto(&cluster)
 	cluster.Status = status
 	err := updater.k8sClient.Status().Update(updater.context, &cluster)
@@ -268,7 +268,7 @@ func timeToString(timestamp time.Time) string {
 	return timestamp.Format(time.RFC3339)
 }
 
-func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorState) error {
+func (updater *InvokerDeploymentStatusUpdater) syncRevisions(observed *ObservedInvokerDeploymentState) error {
 	if observed.cr.Status.CurrentRevision == "" {
 		return updater.createControllerRevision(observed, 1)
 	}
@@ -278,7 +278,7 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 	if err := updater.k8sClient.Get(updater.context, client.ObjectKey{Namespace: updater.observed.cr.Namespace, Name: currentRevisionName}, &lastRevision); err != nil {
 		return err
 	}
-	var lastSpec *v1alpha1.ExecutorSpec
+	var lastSpec *v1alpha1.InvokerDeploymentSpec
 	if err := json.Unmarshal(lastRevision.Data.Raw, &lastSpec); err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func (updater *ExecutorStatusUpdater) syncRevisions(observed *ObservedExecutorSt
 	return nil
 }
 
-func (updater *ExecutorStatusUpdater) createControllerRevision(observed *ObservedExecutorState, revisionNum int) error {
+func (updater *InvokerDeploymentStatusUpdater) createControllerRevision(observed *ObservedInvokerDeploymentState, revisionNum int) error {
 	specBytes, err := json.Marshal(observed.cr.Spec)
 	if err != nil {
 		return err
@@ -304,7 +304,7 @@ func (updater *ExecutorStatusUpdater) createControllerRevision(observed *Observe
 			Name:      revisionName,
 			Namespace: observed.cr.Namespace,
 			Labels: map[string]string{
-				"invoker.io/executor": observed.cr.Name,
+				"invoker.io/invokerdeployment": observed.cr.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(observed.cr, observed.cr.GroupVersionKind()),
@@ -332,7 +332,7 @@ func (updater *ExecutorStatusUpdater) createControllerRevision(observed *Observe
 		}
 	}
 
-	var cluster = v1alpha1.Executor{}
+	var cluster = v1alpha1.InvokerDeployment{}
 	updater.observed.cr.DeepCopyInto(&cluster)
 	cluster.Status.NextRevision = revisionName
 	return nil

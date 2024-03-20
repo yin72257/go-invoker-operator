@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.0
-  name: executors.executor.invoker.io
+  name: invokerdeployments.invokeroperator.invoker.io
 spec:
-  group: executor.invoker.io
+  group: invokeroperator.invoker.io
   names:
-    kind: Executor
-    listKind: ExecutorList
-    plural: executors
-    singular: executor
+    kind: InvokerDeployment
+    listKind: InvokerDeploymentList
+    plural: invokerdeployments
+    singular: invokerdeployment
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Executor is the Schema for the executors API
+        description: InvokerDeployment is the Schema for the InvokerDeployments API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,7 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ExecutorSpec defines the desired state of Executor
+            description: InvokerDeploymentSpec defines the desired state of InvokerDeployment
             properties:
               historyLimit:
                 format: int32
@@ -55,7 +55,7 @@ spec:
                   x-kubernetes-map-type: atomic
                 type: array
               resource:
-                description: Configuration used for executor
+                description: Configuration used for InvokerDeployment
                 properties:
                   claims:
                     description: "Claims lists the names of resources, defined in
@@ -135,11 +135,11 @@ spec:
                   type: object
                 type: array
               version:
-                description: Version of Executor being deployed
+                description: Version of InvokerDeployment being deployed
                 type: string
             type: object
           status:
-            description: ExecutorStatus defines the observed state of Executor
+            description: InvokerDeploymentStatus defines the observed state of InvokerDeployment
             properties:
               components:
                 properties:

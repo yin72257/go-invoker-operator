@@ -31,10 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	executorv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
-	"github.com/yin72257/go-executor-operator/internal/controller"
-
-	"github.com/joho/godotenv"
+	invokeroperatorv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
+	"github.com/yin72257/go-invoker-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -46,15 +44,11 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(executorv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(invokeroperatorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		setupLog.Error(err, "Error loading .env file")
-	}
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -78,9 +72,10 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "275d40e3.invoker.io",
+		LeaderElectionID:       "03c45e30.invoker.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -98,12 +93,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.ExecutorReconciler{
+	if err = (&controller.InvokerDeploymentReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("executor-controller"),
+		Recorder: mgr.GetEventRecorderFor("invoker-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Executor")
+		setupLog.Error(err, "unable to create controller", "controller", "InvokerDeployment")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

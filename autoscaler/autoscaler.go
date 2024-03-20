@@ -3,14 +3,14 @@ package autoscaler
 import (
 	"context"
 
-	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
+	invokerv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Scaler struct {
-	executorCR invokerv1alpha1.Executor
+	executorCR invokerv1alpha1.InvokerDeployment
 	k8sClient  client.Client
 	context    context.Context
 	log        logr.Logger

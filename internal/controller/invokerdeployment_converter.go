@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yin72257/go-executor-operator/api/v1alpha1"
+	"github.com/yin72257/go-invoker-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -20,24 +20,24 @@ import (
 )
 
 func getDesiredClusterState(
-	observed *ObservedExecutorState,
-	now time.Time, scheme *runtime.Scheme) DesiredExecutorState {
-	executor := observed.cr
+	observed *ObservedInvokerDeploymentState,
+	now time.Time, scheme *runtime.Scheme) DesiredInvokerDeploymentState {
+	invokerDeployment := observed.cr
 
-	if executor == nil {
-		return DesiredExecutorState{}
+	if invokerDeployment == nil {
+		return DesiredInvokerDeploymentState{}
 	}
-	return DesiredExecutorState{
-		ConfigMaps:       getDesiredConfigMaps(executor, scheme),
-		Secret:           getDesiredSecret(executor, scheme),
-		EntryService:     getDesiredEntryService(executor, scheme),
-		Ingress:          getDesiredIngress(executor, scheme),
-		StatefulEntities: getDesiredStatefulEntities(executor, scheme),
+	return DesiredInvokerDeploymentState{
+		ConfigMaps:       getDesiredConfigMaps(invokerDeployment, scheme),
+		Secret:           getDesiredSecret(invokerDeployment, scheme),
+		EntryService:     getDesiredEntryService(invokerDeployment, scheme),
+		Ingress:          getDesiredIngress(invokerDeployment, scheme),
+		StatefulEntities: getDesiredStatefulEntities(invokerDeployment, scheme),
 	}
 }
 
 func getDesiredConfigMaps(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) []*corev1.ConfigMap {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) []*corev1.ConfigMap {
 	labels := labels(instance)
 	labels["type"] = "statefulEntity"
 	cmList := []*corev1.ConfigMap{}
@@ -73,7 +73,7 @@ output.topic=%s
 }
 
 func getDesiredDeployment(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *appsv1.Deployment {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) *appsv1.Deployment {
 	labels := labels(instance)
 	name := instance.ObjectMeta.Name
 	dep := &appsv1.Deployment{
@@ -121,7 +121,7 @@ func getDesiredDeployment(
 }
 
 func getDesiredSecret(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *corev1.Secret {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) *corev1.Secret {
 	dockerPassword := os.Getenv("PASSWORD")
 	dockerUsername := os.Getenv("USERNAME")
 	dockerEmail := os.Getenv("EMAIL")
@@ -150,7 +150,7 @@ func getDesiredSecret(
 }
 
 func getDesiredEntryService(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *corev1.Service {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) *corev1.Service {
 
 	namespace := instance.ObjectMeta.Namespace
 	name := instance.ObjectMeta.Name
@@ -179,7 +179,7 @@ func getDesiredEntryService(
 }
 
 func getDesiredIngress(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *networkingv1.Ingress {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) *networkingv1.Ingress {
 
 	namespace := instance.ObjectMeta.Namespace
 	name := instance.ObjectMeta.Name
@@ -221,7 +221,7 @@ func getDesiredIngress(
 }
 
 func getDesiredStatefulSet(
-	instance *v1alpha1.Executor, scheme *runtime.Scheme) *appsv1.StatefulSet {
+	instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) *appsv1.StatefulSet {
 	labels := labels(instance)
 	name := instance.ObjectMeta.Name
 	statefulSet := &appsv1.StatefulSet{
@@ -269,7 +269,7 @@ func getDesiredStatefulSet(
 	return statefulSet
 }
 
-func getDesiredStatefulEntities(instance *v1alpha1.Executor, scheme *runtime.Scheme) []*appsv1.StatefulSet {
+func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) []*appsv1.StatefulSet {
 	labels := labels(instance)
 	labels["type"] = "statefulEntity"
 	seList := []*appsv1.StatefulSet{}
@@ -295,7 +295,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.Executor, scheme *runtime.Sch
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:            "executor-pod",
+								Name:            "invoker-pod",
 								Image:           *statefulEntity.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								VolumeMounts: []corev1.VolumeMount{

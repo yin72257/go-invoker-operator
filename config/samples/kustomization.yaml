@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- executor_v1alpha1_executor.yaml
+- invokeroperator_v1alpha1_invokerdeployment.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

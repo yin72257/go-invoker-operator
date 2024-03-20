@@ -8,16 +8,16 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: go-executor-operator
-repo: github.com/yin72257/go-executor-operator
+projectName: invoker-operator
+repo: github.com/yin72257/go-invoker-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: invoker.io
-  group: executor
-  kind: Executor
-  path: github.com/yin72257/go-executor-operator/api/v1alpha1
+  group: invokeroperator
+  kind: InvokerDeployment
+  path: github.com/yin72257/go-invoker-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

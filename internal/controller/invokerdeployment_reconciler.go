@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/go-logr/logr"
-	"github.com/yin72257/go-executor-operator/api/v1alpha1"
+	"github.com/yin72257/go-invoker-operator/api/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,17 +18,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ExecutorResourceReconciler struct {
+type InvokerDeploymentResourceReconciler struct {
 	k8sClient client.Client
 	context   context.Context
 	log       logr.Logger
-	observed  ObservedExecutorState
-	desired   DesiredExecutorState
+	observed  ObservedInvokerDeploymentState
+	desired   DesiredInvokerDeploymentState
 }
 
 var requeueResult = ctrl.Result{RequeueAfter: 10 * time.Second, Requeue: true}
 
-func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
+func (reconciler *InvokerDeploymentResourceReconciler) reconcile() (ctrl.Result, error) {
 	var err error
 
 	// Child resources of the cluster CR will be automatically reclaimed by K8S.
@@ -39,10 +39,10 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 	// if getUpdateState(reconciler.observed) == UpdateStateInProgress {
 	// 	reconciler.log.Info("The cluster update is in progress")
 	// }
-	err = reconciler.reconcileSecret()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// err = reconciler.reconcileSecret()
+	// if err != nil {
+	// 	return ctrl.Result{}, err
+	// }
 
 	configMapDesired := make(map[string]bool)
 	for _, desiredConfigMap := range reconciler.desired.ConfigMaps {
@@ -80,7 +80,7 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 		}
 	}
 
-	var cluster = v1alpha1.Executor{}
+	var cluster = v1alpha1.InvokerDeployment{}
 	reconciler.observed.cr.DeepCopyInto(&cluster)
 	cluster.Status.CurrentRevision = reconciler.observed.cr.Status.NextRevision
 	err = reconciler.k8sClient.Status().Update(reconciler.context, &cluster)
@@ -91,11 +91,11 @@ func (reconciler *ExecutorResourceReconciler) reconcile() (ctrl.Result, error) {
 
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet(desiredStatefulSet *appsv1.StatefulSet, observedStatefulSet *appsv1.StatefulSet) error {
-	var log = reconciler.log.WithValues("component", "executorStatefulSet")
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileStatefulSet(desiredStatefulSet *appsv1.StatefulSet, observedStatefulSet *appsv1.StatefulSet) error {
+	var log = reconciler.log.WithValues("component", "invokerDeploymentStatefulSet")
 
 	if desiredStatefulSet != nil && observedStatefulSet == nil {
-		return reconciler.createStatefulSet(desiredStatefulSet, "executorStatefulSet")
+		return reconciler.createStatefulSet(desiredStatefulSet, "invokerDeploymentStatefulSet")
 	}
 
 	if desiredStatefulSet != nil && observedStatefulSet != nil {
@@ -111,13 +111,13 @@ func (reconciler *ExecutorResourceReconciler) reconcileStatefulSet(desiredStatef
 	}
 
 	if desiredStatefulSet == nil && observedStatefulSet != nil {
-		return reconciler.deleteStatefulSet(observedStatefulSet, "executorStatefulSet")
+		return reconciler.deleteStatefulSet(observedStatefulSet, "invokerDeploymentStatefulSet")
 	}
 
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createStatefulSet(
+func (reconciler *InvokerDeploymentResourceReconciler) createStatefulSet(
 	statefulSet *appsv1.StatefulSet, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -133,7 +133,7 @@ func (reconciler *ExecutorResourceReconciler) createStatefulSet(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteStatefulSet(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteStatefulSet(
 	statefulSet *appsv1.StatefulSet, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -150,7 +150,7 @@ func (reconciler *ExecutorResourceReconciler) deleteStatefulSet(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileDeployment(
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileDeployment(
 	component string,
 	desiredDeployment *appsv1.Deployment,
 	observedDeployment *appsv1.Deployment) error {
@@ -179,7 +179,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileDeployment(
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createDeployment(
+func (reconciler *InvokerDeploymentResourceReconciler) createDeployment(
 	deployment *appsv1.Deployment, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -195,7 +195,7 @@ func (reconciler *ExecutorResourceReconciler) createDeployment(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteOldComponent(desired runtime.Object, observed runtime.Object, component string) error {
+func (reconciler *InvokerDeploymentResourceReconciler) deleteOldComponent(desired runtime.Object, observed runtime.Object, component string) error {
 	var log = reconciler.log.WithValues("component", component)
 	var err error
 	var context = reconciler.context
@@ -216,7 +216,7 @@ func (reconciler *ExecutorResourceReconciler) deleteOldComponent(desired runtime
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) updateComponent(desired runtime.Object, component string) error {
+func (reconciler *InvokerDeploymentResourceReconciler) updateComponent(desired runtime.Object, component string) error {
 	log := reconciler.log.WithValues("component", component)
 	context := reconciler.context
 	k8sClient := reconciler.k8sClient
@@ -237,7 +237,7 @@ func (reconciler *ExecutorResourceReconciler) updateComponent(desired runtime.Ob
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteDeployment(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteDeployment(
 	deployment *appsv1.Deployment, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -254,14 +254,14 @@ func (reconciler *ExecutorResourceReconciler) deleteDeployment(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileEntryService() error {
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileEntryService() error {
 	return reconciler.reconcileService(
 		"EntryService",
 		reconciler.desired.EntryService,
 		reconciler.observed.entryService)
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileService(component string,
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileService(component string,
 	desiredService *corev1.Service,
 	observedService *corev1.Service) error {
 	var log = reconciler.log.WithValues("component", component)
@@ -288,7 +288,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileService(component string,
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createService(
+func (reconciler *InvokerDeploymentResourceReconciler) createService(
 	service *corev1.Service, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -304,7 +304,7 @@ func (reconciler *ExecutorResourceReconciler) createService(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteService(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteService(
 	service *corev1.Service, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -321,7 +321,7 @@ func (reconciler *ExecutorResourceReconciler) deleteService(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileConfigMap(desiredConfigMap *corev1.ConfigMap, observedConfigMap *corev1.ConfigMap) error {
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileConfigMap(desiredConfigMap *corev1.ConfigMap, observedConfigMap *corev1.ConfigMap) error {
 	if desiredConfigMap != nil && observedConfigMap == nil {
 		return reconciler.createConfigMap(desiredConfigMap, "ConfigMap")
 	}
@@ -345,7 +345,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileConfigMap(desiredConfigMa
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createConfigMap(
+func (reconciler *InvokerDeploymentResourceReconciler) createConfigMap(
 	cm *corev1.ConfigMap, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -361,7 +361,7 @@ func (reconciler *ExecutorResourceReconciler) createConfigMap(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteConfigMap(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteConfigMap(
 	cm *corev1.ConfigMap, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -378,7 +378,7 @@ func (reconciler *ExecutorResourceReconciler) deleteConfigMap(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileSecret() error {
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileSecret() error {
 	var desiredSecret = reconciler.desired.Secret
 	var observedSecret = reconciler.observed.secret
 
@@ -398,7 +398,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileSecret() error {
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createSecret(
+func (reconciler *InvokerDeploymentResourceReconciler) createSecret(
 	secret *corev1.Secret, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -414,7 +414,7 @@ func (reconciler *ExecutorResourceReconciler) createSecret(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteSecret(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteSecret(
 	secret *corev1.Secret, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -431,7 +431,7 @@ func (reconciler *ExecutorResourceReconciler) deleteSecret(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcileIngress() error {
+func (reconciler *InvokerDeploymentResourceReconciler) reconcileIngress() error {
 	var desiredIngress = reconciler.desired.Ingress
 	var observedIngress = reconciler.observed.ingress
 
@@ -458,7 +458,7 @@ func (reconciler *ExecutorResourceReconciler) reconcileIngress() error {
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createIngress(
+func (reconciler *InvokerDeploymentResourceReconciler) createIngress(
 	ingress *networkingv1.Ingress, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -474,7 +474,7 @@ func (reconciler *ExecutorResourceReconciler) createIngress(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deleteIngress(
+func (reconciler *InvokerDeploymentResourceReconciler) deleteIngress(
 	ingress *networkingv1.Ingress, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -491,7 +491,7 @@ func (reconciler *ExecutorResourceReconciler) deleteIngress(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) cleanupOldRevisions() error {
+func (reconciler *InvokerDeploymentResourceReconciler) cleanupOldRevisions() error {
 	revisions := reconciler.observed.revisions
 	if len(revisions) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
 		return nil // Nothing to do
@@ -512,7 +512,7 @@ func (reconciler *ExecutorResourceReconciler) cleanupOldRevisions() error {
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) reconcilePod(
+func (reconciler *InvokerDeploymentResourceReconciler) reconcilePod(
 	component string,
 	desiredPod *corev1.Pod,
 	observedPod *corev1.Pod) error {
@@ -541,7 +541,7 @@ func (reconciler *ExecutorResourceReconciler) reconcilePod(
 	return nil
 }
 
-func (reconciler *ExecutorResourceReconciler) createPod(
+func (reconciler *InvokerDeploymentResourceReconciler) createPod(
 	pod *corev1.Pod, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)
@@ -557,7 +557,7 @@ func (reconciler *ExecutorResourceReconciler) createPod(
 	return err
 }
 
-func (reconciler *ExecutorResourceReconciler) deletePod(
+func (reconciler *InvokerDeploymentResourceReconciler) deletePod(
 	pod *corev1.Pod, component string) error {
 	var context = reconciler.context
 	var log = reconciler.log.WithValues("component", component)

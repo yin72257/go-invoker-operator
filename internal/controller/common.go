@@ -5,14 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
+	invokerv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func labels(instance *invokerv1alpha1.Executor) map[string]string {
+func labels(instance *invokerv1alpha1.InvokerDeployment) map[string]string {
 	return map[string]string{
-		"app": "executor",
+		"app": "invoker",
 	}
 }
 

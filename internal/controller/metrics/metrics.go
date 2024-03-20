@@ -8,7 +8,7 @@ import (
 var (
 	ApplicationUpgradeCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "executor_upgrade_counter",
+			Name: "invoker_deployment_upgrade_counter",
 			Help: "Number of successful upgrades processed",
 		},
 	)

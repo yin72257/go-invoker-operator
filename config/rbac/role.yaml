@@ -101,9 +101,9 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - executor.invoker.io
+  - invokeroperator.invoker.io
   resources:
-  - executors
+  - invokerdeployments
   verbs:
   - create
   - delete
@@ -113,15 +113,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - executor.invoker.io
+  - invokeroperator.invoker.io
   resources:
-  - executors/finalizers
+  - invokerdeployments/finalizers
   verbs:
   - update
 - apiGroups:
-  - executor.invoker.io
+  - invokeroperator.invoker.io
   resources:
-  - executors/status
+  - invokerdeployments/status
   verbs:
   - get
   - patch

@@ -59,12 +59,12 @@ type StatefulEntity struct {
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ExecutorSpec defines the desired state of Executor
-type ExecutorSpec struct {
+// InvokerDeploymentSpec defines the desired state of InvokerDeployment
+type InvokerDeploymentSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Version of Executor being deployed
+	// Version of InvokerDeployment being deployed
 	Version string `json:"version,omitempty"`
 
 	// Image pull policy: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -74,7 +74,7 @@ type ExecutorSpec struct {
 	// An optional list of references to Secrets
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// Configuration used for executor
+	// Configuration used for InvokerDeployment
 	// +optional
 	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 
@@ -96,8 +96,8 @@ type ComponentsStatus struct {
 	Ingress string `json:"ingress"`
 }
 
-// ExecutorStatus defines the observed state of Executor
-type ExecutorStatus struct {
+// InvokerDeploymentStatus defines the observed state of InvokerDeployment
+type InvokerDeploymentStatus struct {
 	// Conditions of the instances
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -116,24 +116,24 @@ type ExecutorStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Executor is the Schema for the executors API
-type Executor struct {
+// InvokerDeployment is the Schema for the InvokerDeployments API
+type InvokerDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ExecutorSpec   `json:"spec,omitempty"`
-	Status ExecutorStatus `json:"status,omitempty"`
+	Spec   InvokerDeploymentSpec   `json:"spec,omitempty"`
+	Status InvokerDeploymentStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ExecutorList contains a list of Executor
-type ExecutorList struct {
+// InvokerDeploymentList contains a list of InvokerDeployment
+type InvokerDeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Executor `json:"items"`
+	Items           []InvokerDeployment `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Executor{}, &ExecutorList{})
+	SchemeBuilder.Register(&InvokerDeployment{}, &InvokerDeploymentList{})
 }

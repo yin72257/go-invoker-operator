@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
+	invokerv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -16,49 +16,49 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ExecutorStateObserver gets the observed state of the cluster.
-type ExecutorStateObserver struct {
+// InvokerDeploymentStateObserver gets the observed state of the cluster.
+type InvokerDeploymentStateObserver struct {
 	k8sClient client.Client
 	request   ctrl.Request
 	context   context.Context
 	log       logr.Logger
 }
 
-// ObservedExecutorState holds observed state of a cluster.
-type ObservedExecutorState struct {
-	cr                  *invokerv1alpha1.Executor
-	revisions           []*appsv1.ControllerRevision
-	configMaps          map[string]*corev1.ConfigMap
-	executorStatefulSet *appsv1.StatefulSet
-	secret              *corev1.Secret
-	observeTime         time.Time
-	entryService        *corev1.Service
-	statefulSetService  *corev1.Service
-	ingress             *networkingv1.Ingress
-	statefulEntities    map[string]*appsv1.StatefulSet
+// ObservedInvokerDeploymentState holds observed state of a cluster.
+type ObservedInvokerDeploymentState struct {
+	cr                           *invokerv1alpha1.InvokerDeployment
+	revisions                    []*appsv1.ControllerRevision
+	configMaps                   map[string]*corev1.ConfigMap
+	invokerDeploymentStatefulSet *appsv1.StatefulSet
+	secret                       *corev1.Secret
+	observeTime                  time.Time
+	entryService                 *corev1.Service
+	statefulSetService           *corev1.Service
+	ingress                      *networkingv1.Ingress
+	statefulEntities             map[string]*appsv1.StatefulSet
 }
 
-type ExecutorStatus struct {
+type InvokerDeploymentStatus struct {
 }
 
 // Observes the state of the cluster and its components.
 // NOT_FOUND error is ignored because it is normal, other errors are returned.
-func (observer *ExecutorStateObserver) observe(
-	observed *ObservedExecutorState) error {
+func (observer *InvokerDeploymentStateObserver) observe(
+	observed *ObservedInvokerDeploymentState) error {
 	var err error
 	var log = observer.log
 
-	var observedCR = new(invokerv1alpha1.Executor)
+	var observedCR = new(invokerv1alpha1.InvokerDeployment)
 	err = observer.observeSpec(observedCR)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get the executor resource")
+			log.Error(err, "Failed to get the invokerDeployment resource")
 			return err
 		}
-		log.Info("Observed executor", "executor", "nil")
+		log.Info("Observed invokerDeployment", "invokerDeployment", "nil")
 		observedCR = nil
 	} else {
-		log.Info("Observed executor", "executor", *observedCR)
+		log.Info("Observed invokerDeployment", "invokerDeployment", *observedCR)
 		observed.cr = observedCR
 	}
 	if observed.cr == nil {
@@ -98,22 +98,22 @@ func (observer *ExecutorStateObserver) observe(
 		}
 	}
 
-	// Executor StatefulSet.
-	var observedExecutorStatefulSet = new(appsv1.StatefulSet)
-	err = observer.observeExecutorStatefulSet(observedExecutorStatefulSet)
+	// InvokerDeployment StatefulSet.
+	var observedInvokerDeploymentStatefulSet = new(appsv1.StatefulSet)
+	err = observer.observeInvokerDeploymentStatefulSet(observedInvokerDeploymentStatefulSet)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Executor StatefulSet")
+			log.Error(err, "Failed to get InvokerDeployment StatefulSet")
 			return err
 		}
-		log.Info("Observed Executor StatefulSet", "state", "nil")
-		observedExecutorStatefulSet = nil
+		log.Info("Observed InvokerDeployment StatefulSet", "state", "nil")
+		observedInvokerDeploymentStatefulSet = nil
 	} else {
-		log.Info("Observed Executor StatefulSet", "state", *observedExecutorStatefulSet)
-		observed.executorStatefulSet = observedExecutorStatefulSet
+		log.Info("Observed InvokerDeployment StatefulSet", "state", *observedInvokerDeploymentStatefulSet)
+		observed.invokerDeploymentStatefulSet = observedInvokerDeploymentStatefulSet
 	}
 
-	// Executor service.
+	// InvokerDeployment service.
 	var observedEntryService = new(corev1.Service)
 	err = observer.observeService(observedEntryService, getEntryServiceName(observer.request.Name))
 	if err != nil {
@@ -128,7 +128,7 @@ func (observer *ExecutorStateObserver) observe(
 		observed.entryService = observedEntryService
 	}
 
-	// Executor stateful set service.
+	// InvokerDeployment stateful set service.
 	var observedStatefulSetService = new(corev1.Service)
 	err = observer.observeService(observedStatefulSetService, getStatefulSetName(observer.request.Name))
 	if err != nil {
@@ -143,7 +143,7 @@ func (observer *ExecutorStateObserver) observe(
 		observed.statefulSetService = observedStatefulSetService
 	}
 
-	// Executor ingress.
+	// InvokerDeployment ingress.
 	var observedIngress = new(networkingv1.Ingress)
 	err = observer.observeIngress(observedIngress)
 	if err != nil {
@@ -203,28 +203,28 @@ func (observer *ExecutorStateObserver) observe(
 	return nil
 }
 
-func (observer *ExecutorStateObserver) observeRevisions(revisions *appsv1.ControllerRevisionList) error {
-	selector := client.MatchingLabels{"invoker.io/executor": observer.request.Name}
+func (observer *InvokerDeploymentStateObserver) observeRevisions(revisions *appsv1.ControllerRevisionList) error {
+	selector := client.MatchingLabels{"invoker.io/invokerDeployment": observer.request.Name}
 	if err := observer.k8sClient.List(observer.context, revisions, client.InNamespace(observer.request.Namespace), selector); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (observer *ExecutorStateObserver) observeSpec(
-	executor *invokerv1alpha1.Executor) error {
+func (observer *InvokerDeploymentStateObserver) observeSpec(
+	invokerDeployment *invokerv1alpha1.InvokerDeployment) error {
 	return observer.k8sClient.Get(
-		observer.context, observer.request.NamespacedName, executor)
+		observer.context, observer.request.NamespacedName, invokerDeployment)
 }
 
-func (observer *ExecutorStateObserver) observeConfigMaps(
+func (observer *InvokerDeploymentStateObserver) observeConfigMaps(
 	observedConfigMaps *corev1.ConfigMapList) error {
 	var namespace = observer.request.Namespace
 	labelSelector := client.MatchingLabels{"type": "statefulEntity"}
 	return observer.k8sClient.List(observer.context, observedConfigMaps, labelSelector, client.InNamespace(namespace))
 }
 
-func (observer *ExecutorStateObserver) observeSecret(
+func (observer *InvokerDeploymentStateObserver) observeSecret(
 	observedSecret *corev1.Secret) error {
 	var clusterNamespace = observer.request.Namespace
 
@@ -237,15 +237,15 @@ func (observer *ExecutorStateObserver) observeSecret(
 		observedSecret)
 }
 
-func (observer *ExecutorStateObserver) observeExecutorStatefulSet(
+func (observer *InvokerDeploymentStateObserver) observeInvokerDeploymentStatefulSet(
 	observedStatefulSet *appsv1.StatefulSet) error {
-	var executorNamespace = observer.request.Namespace
-	var executorName = observer.request.Name
+	var invokerDeploymentNamespace = observer.request.Namespace
+	var invokerDeploymentName = observer.request.Name
 	return observer.observeStatefulSet(
-		executorNamespace, executorName, "Executor", observedStatefulSet)
+		invokerDeploymentNamespace, invokerDeploymentName, "InvokerDeployment", observedStatefulSet)
 }
 
-func (observer *ExecutorStateObserver) observeDeployment(
+func (observer *InvokerDeploymentStateObserver) observeDeployment(
 	namespace string,
 	name string,
 	component string,
@@ -268,7 +268,7 @@ func (observer *ExecutorStateObserver) observeDeployment(
 	return err
 }
 
-func (observer *ExecutorStateObserver) observeStatefulSet(
+func (observer *InvokerDeploymentStateObserver) observeStatefulSet(
 	namespace string,
 	name string,
 	component string,
@@ -291,7 +291,7 @@ func (observer *ExecutorStateObserver) observeStatefulSet(
 	return err
 }
 
-func (observer *ExecutorStateObserver) observeService(
+func (observer *InvokerDeploymentStateObserver) observeService(
 	observedService *corev1.Service, serviceName string) error {
 	var namespace = observer.request.Namespace
 
@@ -304,7 +304,7 @@ func (observer *ExecutorStateObserver) observeService(
 		observedService)
 }
 
-func (observer *ExecutorStateObserver) observeIngress(
+func (observer *InvokerDeploymentStateObserver) observeIngress(
 	observedIngress *networkingv1.Ingress) error {
 	var namespace = observer.request.Namespace
 	var name = observer.request.Name
@@ -318,7 +318,7 @@ func (observer *ExecutorStateObserver) observeIngress(
 		observedIngress)
 }
 
-func (observer *ExecutorStateObserver) observeStatefulEntities(observedStatefulEntities *appsv1.StatefulSetList) error {
+func (observer *InvokerDeploymentStateObserver) observeStatefulEntities(observedStatefulEntities *appsv1.StatefulSetList) error {
 	var namespace = observer.request.Namespace
 	labelSelector := client.MatchingLabels{"type": "statefulEntity"}
 	if err := observer.k8sClient.List(observer.context, observedStatefulEntities, labelSelector, client.InNamespace(namespace)); err != nil {

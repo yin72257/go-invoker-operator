@@ -33,27 +33,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	invokerv1alpha1 "github.com/yin72257/go-executor-operator/api/v1alpha1"
+	invokerv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
-var log = ctrllog.Log.WithName("controller_executor")
+var log = ctrllog.Log.WithName("controller_invokerDeployment")
 
-const executorFinalizer = "executor.invoker.io/finalizer"
+const invokerDeploymentFinalizer = "invokeroperator.invoker.io/finalizer"
 
 const (
 	typeAvailable = "Available"
 	typeDegraded  = "Degraded"
 )
 
-// ExecutorReconciler reconciles a Executor object
-type ExecutorReconciler struct {
+// InvokerDeploymentReconciler reconciles a InvokerDeployment object
+type InvokerDeploymentReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-type DesiredExecutorState struct {
+type DesiredInvokerDeploymentState struct {
 	EntryService     *v1.Service
 	ConfigMaps       []*v1.ConfigMap
 	Secret           *v1.Secret
@@ -61,19 +61,19 @@ type DesiredExecutorState struct {
 	StatefulEntities []*appsv1.StatefulSet
 }
 
-type ExecutorHandler struct {
+type InvokerDeploymentHandler struct {
 	k8sClient client.Client
 	request   ctrl.Request
 	context   context.Context
 	log       logr.Logger
 	recorder  record.EventRecorder
-	observed  ObservedExecutorState
-	desired   DesiredExecutorState
+	observed  ObservedInvokerDeploymentState
+	desired   DesiredInvokerDeploymentState
 }
 
-//+kubebuilder:rbac:groups=executor.invoker.io,resources=executors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=executor.invoker.io,resources=executors/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=executor.invoker.io,resources=executors/finalizers,verbs=update
+//+kubebuilder:rbac:groups=invokeroperator.invoker.io,resources=invokerdeployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=invokeroperator.invoker.io,resources=invokerdeployments/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=invokeroperator.invoker.io,resources=invokerdeployments/finalizers,verbs=update
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
@@ -90,38 +90,38 @@ type ExecutorHandler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the Executor object against the actual cluster state, and then
+// the InvokerDeployment object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *ExecutorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *InvokerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	log.Info("Reconciling")
 
-	handler := ExecutorHandler{
+	handler := InvokerDeploymentHandler{
 		k8sClient: r.Client,
 		request:   req,
 		context:   ctx,
 		log:       log,
-		observed:  ObservedExecutorState{},
+		observed:  ObservedInvokerDeploymentState{},
 		recorder:  r.Recorder,
 	}
 	return handler.reconcile(req, r.Scheme)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ExecutorReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *InvokerDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&invokerv1alpha1.Executor{}).
+		For(&invokerv1alpha1.InvokerDeployment{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&v1.Service{}).
 		Complete(r)
 }
 
-func (handler *ExecutorHandler) reconcile(
+func (handler *InvokerDeploymentHandler) reconcile(
 	request ctrl.Request, scheme *runtime.Scheme) (ctrl.Result, error) {
 	var k8sClient = handler.k8sClient
 	var log = handler.log
@@ -134,7 +134,7 @@ func (handler *ExecutorHandler) reconcile(
 	log.Info("============================================================")
 	log.Info("---------- 1. Observe the current state ----------")
 
-	var observer = ExecutorStateObserver{
+	var observer = InvokerDeploymentStateObserver{
 		k8sClient: k8sClient,
 		request:   request,
 		context:   context,
@@ -150,9 +150,9 @@ func (handler *ExecutorHandler) reconcile(
 		return ctrl.Result{}, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(observed.cr, executorFinalizer) {
-		log.Info("Adding finalizer for executor")
-		if ok := controllerutil.AddFinalizer(observed.cr, executorFinalizer); !ok {
+	if !controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
+		log.Info("Adding finalizer for invokerDeployment")
+		if ok := controllerutil.AddFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
 			log.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, nil
 		}
@@ -162,16 +162,16 @@ func (handler *ExecutorHandler) reconcile(
 		}
 	}
 
-	log.Info("---------- 2. Update executor status ----------")
+	log.Info("---------- 2. Update invokerDeployment status ----------")
 
-	var updater = ExecutorStatusUpdater{
+	var updater = InvokerDeploymentStatusUpdater{
 		k8sClient: k8sClient,
 		context:   context,
 		log:       log,
 		observed:  handler.observed,
 	}
 	if observed.cr.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(observed.cr, executorFinalizer) {
+		if controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
 			if err = updater.updateCondition(&metav1.Condition{
 				Type:    typeDegraded,
 				Status:  metav1.ConditionUnknown,
@@ -184,7 +184,7 @@ func (handler *ExecutorHandler) reconcile(
 			handler.doFinalizeOperation()
 
 			if err = observer.observe(observed); err != nil {
-				log.Error(err, "Failed to re-fetch Executor")
+				log.Error(err, "Failed to re-fetch InvokerDeployment")
 				return ctrl.Result{}, err
 			}
 
@@ -198,12 +198,12 @@ func (handler *ExecutorHandler) reconcile(
 			}
 
 			if err = observer.observe(observed); err != nil {
-				log.Error(err, "Failed to re-fetch Executor")
+				log.Error(err, "Failed to re-fetch InvokerDeployment")
 				return ctrl.Result{}, err
 			}
 
 			log.Info("Removing Finalizer after successful operation")
-			if ok := controllerutil.RemoveFinalizer(observed.cr, executorFinalizer); !ok {
+			if ok := controllerutil.RemoveFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
 				log.Error(err, "Failed to remove finalizer")
 				return ctrl.Result{Requeue: true}, nil
 			}
@@ -219,7 +219,7 @@ func (handler *ExecutorHandler) reconcile(
 
 	statusChanged, err = updater.updateStatusIfChanged()
 	if err != nil {
-		log.Error(err, "Failed to update executor status")
+		log.Error(err, "Failed to update invokerDeployment status")
 		return ctrl.Result{}, err
 	}
 	if statusChanged {
@@ -259,7 +259,7 @@ func (handler *ExecutorHandler) reconcile(
 
 	log.Info("---------- 4. Take actions ----------")
 
-	var reconciler = ExecutorResourceReconciler{
+	var reconciler = InvokerDeploymentResourceReconciler{
 		k8sClient: k8sClient,
 		context:   context,
 		log:       log,
@@ -286,7 +286,7 @@ func (handler *ExecutorHandler) reconcile(
 	return result, err
 }
 
-func (handler *ExecutorHandler) doFinalizeOperation() {
+func (handler *InvokerDeploymentHandler) doFinalizeOperation() {
 	handler.recorder.Event(handler.observed.cr, "Warning", "Deleting", fmt.Sprintf("Custom Resource %s is being deleted from the namespace %s",
 		handler.request.Name,
 		handler.request.Namespace))

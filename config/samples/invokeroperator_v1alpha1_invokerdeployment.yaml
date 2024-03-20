@@ -1,0 +1,50 @@
+apiVersion: invokeroperator.invoker.io/v1alpha1
+kind: InvokerDeployment
+metadata:
+  labels:
+    app.kubernetes.io/name: invokerdeployment
+    app.kubernetes.io/instance: invokerdeployment-sample
+    app.kubernetes.io/part-of: invoker-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: invoker-operator
+  name: invokerdeployment-sample
+spec:
+  imagePullPolicy: "IfNotPresent"
+  statefulEntities:
+    - brokerIp: "10.64.212.148:9092"
+      image: "ruohang/executor-word-count:testv1"
+      inputSidecar: "ruohang/iosidecar:testv1"
+      inputTopic: "test"
+      stateSidecar: "ruohang/statesidecar:testv1"
+      outputSidecar: "ruohang/producersidecar:testv1"
+      outputTopic: "count"
+      name: "word-count"
+      topology:
+       - partitions:
+          - "0"
+       - partitions:
+          - "1"
+    - brokerIp: "10.64.212.148:9092"
+      image: "ruohang/executor-sum:testv1"
+      inputSidecar: "ruohang/iosidecar:testv1"
+      inputTopic: "count"
+      stateSidecar: "ruohang/statesidecar:testv1"
+      outputSidecar: "ruohang/producersidecar:testv1"
+      outputTopic: "output"
+      name: "sum"
+      topology:
+       - partitions:
+          - "0"
+  resource:
+    claims:
+    - name: cpu
+    - name: memory
+    limits:
+      cpu: 1
+      memory: "1Gi"
+    requests:
+      cpu: 500m
+      memory: "512Mi"
+  version: "testv1"
+  historyLimit: 3
+

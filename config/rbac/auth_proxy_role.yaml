@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: proxy-role
     app.kubernetes.io/component: kube-rbac-proxy
-    app.kubernetes.io/created-by: go-executor-operator
-    app.kubernetes.io/part-of: go-executor-operator
+    app.kubernetes.io/created-by: invoker-operator
+    app.kubernetes.io/part-of: invoker-operator
     app.kubernetes.io/managed-by: kustomize
   name: proxy-role
 rules:
