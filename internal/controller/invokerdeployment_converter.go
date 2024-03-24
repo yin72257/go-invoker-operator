@@ -50,9 +50,9 @@ func getDesiredConfigMaps(
 kafka.broker=%s
 input.topic=%s
 output.topic=%s
-`, *statefulEntity.BrokerIp, *statefulEntity.InputTopic, *statefulEntity.OutputTopic),
+`, *statefulEntity.IOAddress, *statefulEntity.InputTopic, *statefulEntity.OutputTopic),
 		}
-		for index, podConfig := range statefulEntity.Topology {
+		for index, podConfig := range statefulEntity.Pods {
 			key := fmt.Sprintf(`%s-%d.partitions`, *statefulEntity.Name, index)
 			value := strings.Join(podConfig.Partitions, ",")
 			data[key] = value
@@ -107,7 +107,6 @@ func getDesiredDeployment(
 								},
 							},
 							ImagePullPolicy: instance.Spec.ImagePullPolicy,
-							Resources:       instance.Spec.Resource,
 						},
 					},
 					ImagePullSecrets: getSecretName(),
@@ -256,7 +255,6 @@ func getDesiredStatefulSet(
 								},
 							},
 							ImagePullPolicy: instance.Spec.ImagePullPolicy,
-							Resources:       instance.Spec.Resource,
 						},
 					},
 					ImagePullSecrets: getSecretName(),
@@ -275,7 +273,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 	seList := []*appsv1.StatefulSet{}
 
 	for _, statefulEntity := range instance.Spec.StatefulEntities {
-		replicas := int32(len(statefulEntity.Topology))
+		replicas := int32(len(statefulEntity.Pods))
 		statefulSet := &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      *statefulEntity.Name,
@@ -296,7 +294,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 						Containers: []corev1.Container{
 							{
 								Name:            "invoker-pod",
-								Image:           *statefulEntity.Image,
+								Image:           *statefulEntity.ExecutorImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								VolumeMounts: []corev1.VolumeMount{
 									{
@@ -307,7 +305,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 							},
 							{
 								Name:            "input-sidecar",
-								Image:           *statefulEntity.InputSidecar,
+								Image:           *statefulEntity.InputImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Env: []corev1.EnvVar{
 									{
@@ -328,12 +326,12 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 							},
 							{
 								Name:            "state-sidecar",
-								Image:           *statefulEntity.StateSidecar,
+								Image:           *statefulEntity.StateImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 							},
 							{
 								Name:            "producer-sidecar",
-								Image:           *statefulEntity.OutputSidecar,
+								Image:           *statefulEntity.OutputImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Env: []corev1.EnvVar{
 									{

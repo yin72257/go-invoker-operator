@@ -11,40 +11,30 @@ metadata:
 spec:
   imagePullPolicy: "IfNotPresent"
   statefulEntities:
-    - brokerIp: "10.64.212.148:9092"
-      image: "ruohang/executor-word-count:testv1"
-      inputSidecar: "ruohang/iosidecar:testv1"
+    - executorImage: "ruohang/executor-word-count:testv1"
+      inputImage: "ruohang/iosidecar:testv1"
+      stateImage: "ruohang/statesidecar:testv1"
+      outputImage: "ruohang/producersidecar:testv1"
+      ioAddress: "10.64.212.148:9092"
       inputTopic: "test"
-      stateSidecar: "ruohang/statesidecar:testv1"
-      outputSidecar: "ruohang/producersidecar:testv1"
       outputTopic: "count"
       name: "word-count"
-      topology:
+      pods:
        - partitions:
           - "0"
        - partitions:
           - "1"
-    - brokerIp: "10.64.212.148:9092"
-      image: "ruohang/executor-sum:testv1"
-      inputSidecar: "ruohang/iosidecar:testv1"
+    - executorImage: "ruohang/executor-sum:testv1"
+      inputImage: "ruohang/iosidecar:testv1"
+      stateImage: "ruohang/statesidecar:testv1"
+      outputImage: "ruohang/producersidecar:testv1"
+      ioAddress: "10.64.212.148:9092"
       inputTopic: "count"
-      stateSidecar: "ruohang/statesidecar:testv1"
-      outputSidecar: "ruohang/producersidecar:testv1"
       outputTopic: "output"
       name: "sum"
-      topology:
+      pods:
        - partitions:
           - "0"
-  resource:
-    claims:
-    - name: cpu
-    - name: memory
-    limits:
-      cpu: 1
-      memory: "1Gi"
-    requests:
-      cpu: 500m
-      memory: "512Mi"
   version: "testv1"
   historyLimit: 3
 

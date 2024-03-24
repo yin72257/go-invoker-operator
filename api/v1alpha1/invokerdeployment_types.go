@@ -39,21 +39,25 @@ const (
 
 type PodConfig struct {
 	Partitions []string `json:"partitions,omitempty"`
+	// Configuration used for InvokerDeployment
+	// +optional
+	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 }
 
 type StatefulEntity struct {
-	BrokerIp      *string `json:"brokerIp,omitempty"`
-	Image         *string `json:"image,omitempty"`
-	InputSidecar  *string `json:"inputSidecar,omitempty"`
-	InputTopic    *string `json:"inputTopic,omitempty"`
-	StateSidecar  *string `json:"stateSidecar,omitempty"`
-	OutputSidecar *string `json:"outputSidecar,omitempty"`
-	OutputTopic   *string `json:"outputTopic,omitempty"`
 	Name          *string `json:"name,omitempty"`
+	ExecutorImage *string `json:"executorImage,omitempty"`
+	InputImage    *string `json:"inputImage,omitempty"`
+	StateImage    *string `json:"stateImage,omitempty"`
+	OutputImage   *string `json:"outputImage,omitempty"`
+
+	IOAddress   *string `json:"ioAddress,omitempty"`
+	InputTopic  *string `json:"inputTopic,omitempty"`
+	OutputTopic *string `json:"outputTopic,omitempty"`
 	// Default: 1
 	// +optional
 	// +kubebuilder:validation:MinItems:=1
-	Topology []PodConfig `json:"topology,omitempty"`
+	Pods []PodConfig `json:"pods,omitempty"`
 }
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -73,10 +77,6 @@ type InvokerDeploymentSpec struct {
 
 	// An optional list of references to Secrets
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
-	// Configuration used for InvokerDeployment
-	// +optional
-	Resource v1.ResourceRequirements `json:"resource,omitempty"`
 
 	StatefulEntities []StatefulEntity `json:"statefulEntities,omitempty"`
 
