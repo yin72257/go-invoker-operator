@@ -38,6 +38,7 @@ const (
 )
 
 type PodConfig struct {
+	Name       *string  `json:"name,omitempty"`
 	Partitions []string `json:"partitions,omitempty"`
 	// Configuration used for InvokerDeployment
 	// +optional
@@ -47,9 +48,8 @@ type PodConfig struct {
 type StatefulEntity struct {
 	Name          *string `json:"name,omitempty"`
 	ExecutorImage *string `json:"executorImage,omitempty"`
-	InputImage    *string `json:"inputImage,omitempty"`
+	IOImage       *string `json:"ioImage,omitempty"`
 	StateImage    *string `json:"stateImage,omitempty"`
-	OutputImage   *string `json:"outputImage,omitempty"`
 
 	IOAddress   *string `json:"ioAddress,omitempty"`
 	InputTopic  *string `json:"inputTopic,omitempty"`

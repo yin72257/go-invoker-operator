@@ -190,18 +190,13 @@ func (in *StatefulEntity) DeepCopyInto(out *StatefulEntity) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.InputImage != nil {
-		in, out := &in.InputImage, &out.InputImage
+	if in.IOImage != nil {
+		in, out := &in.IOImage, &out.IOImage
 		*out = new(string)
 		**out = **in
 	}
 	if in.StateImage != nil {
 		in, out := &in.StateImage, &out.StateImage
-		*out = new(string)
-		**out = **in
-	}
-	if in.OutputImage != nil {
-		in, out := &in.OutputImage, &out.OutputImage
 		*out = new(string)
 		**out = **in
 	}

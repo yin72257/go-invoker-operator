@@ -99,64 +99,64 @@ func (observer *InvokerDeploymentStateObserver) observe(
 	}
 
 	// InvokerDeployment StatefulSet.
-	var observedInvokerDeploymentStatefulSet = new(appsv1.StatefulSet)
-	err = observer.observeInvokerDeploymentStatefulSet(observedInvokerDeploymentStatefulSet)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get InvokerDeployment StatefulSet")
-			return err
-		}
-		log.Info("Observed InvokerDeployment StatefulSet", "state", "nil")
-		observedInvokerDeploymentStatefulSet = nil
-	} else {
-		log.Info("Observed InvokerDeployment StatefulSet", "state", *observedInvokerDeploymentStatefulSet)
-		observed.invokerDeploymentStatefulSet = observedInvokerDeploymentStatefulSet
-	}
+	// var observedInvokerDeploymentStatefulSet = new(appsv1.StatefulSet)
+	// err = observer.observeInvokerDeploymentStatefulSet(observedInvokerDeploymentStatefulSet)
+	// if err != nil {
+	// 	if client.IgnoreNotFound(err) != nil {
+	// 		log.Error(err, "Failed to get InvokerDeployment StatefulSet")
+	// 		return err
+	// 	}
+	// 	log.Info("Observed InvokerDeployment StatefulSet", "state", "nil")
+	// 	observedInvokerDeploymentStatefulSet = nil
+	// } else {
+	// 	log.Info("Observed InvokerDeployment StatefulSet", "state", *observedInvokerDeploymentStatefulSet)
+	// 	observed.invokerDeploymentStatefulSet = observedInvokerDeploymentStatefulSet
+	// }
 
-	// InvokerDeployment service.
-	var observedEntryService = new(corev1.Service)
-	err = observer.observeService(observedEntryService, getEntryServiceName(observer.request.Name))
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Entry service")
-			return err
-		}
-		log.Info("Observed Entry service", "state", "nil")
-		observedEntryService = nil
-	} else {
-		log.Info("Observed Entry service", "state", *observedEntryService)
-		observed.entryService = observedEntryService
-	}
+	// // InvokerDeployment service.
+	// var observedEntryService = new(corev1.Service)
+	// err = observer.observeService(observedEntryService, getEntryServiceName(observer.request.Name))
+	// if err != nil {
+	// 	if client.IgnoreNotFound(err) != nil {
+	// 		log.Error(err, "Failed to get Entry service")
+	// 		return err
+	// 	}
+	// 	log.Info("Observed Entry service", "state", "nil")
+	// 	observedEntryService = nil
+	// } else {
+	// 	log.Info("Observed Entry service", "state", *observedEntryService)
+	// 	observed.entryService = observedEntryService
+	// }
 
-	// InvokerDeployment stateful set service.
-	var observedStatefulSetService = new(corev1.Service)
-	err = observer.observeService(observedStatefulSetService, getStatefulSetName(observer.request.Name))
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get StatefulSet service")
-			return err
-		}
-		log.Info("Observed StatefulSet service", "state", "nil")
-		observedStatefulSetService = nil
-	} else {
-		log.Info("Observed StatefulSet service", "state", *observedStatefulSetService)
-		observed.statefulSetService = observedStatefulSetService
-	}
+	// // InvokerDeployment stateful set service.
+	// var observedStatefulSetService = new(corev1.Service)
+	// err = observer.observeService(observedStatefulSetService, getStatefulSetName(observer.request.Name))
+	// if err != nil {
+	// 	if client.IgnoreNotFound(err) != nil {
+	// 		log.Error(err, "Failed to get StatefulSet service")
+	// 		return err
+	// 	}
+	// 	log.Info("Observed StatefulSet service", "state", "nil")
+	// 	observedStatefulSetService = nil
+	// } else {
+	// 	log.Info("Observed StatefulSet service", "state", *observedStatefulSetService)
+	// 	observed.statefulSetService = observedStatefulSetService
+	// }
 
-	// InvokerDeployment ingress.
-	var observedIngress = new(networkingv1.Ingress)
-	err = observer.observeIngress(observedIngress)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Ingress")
-			return err
-		}
-		log.Info("Observed Ingress", "state", "nil")
-		observedIngress = nil
-	} else {
-		log.Info("Observed Ingress", "state", *observedIngress)
-		observed.ingress = observedIngress
-	}
+	// // InvokerDeployment ingress.
+	// var observedIngress = new(networkingv1.Ingress)
+	// err = observer.observeIngress(observedIngress)
+	// if err != nil {
+	// 	if client.IgnoreNotFound(err) != nil {
+	// 		log.Error(err, "Failed to get Ingress")
+	// 		return err
+	// 	}
+	// 	log.Info("Observed Ingress", "state", "nil")
+	// 	observedIngress = nil
+	// } else {
+	// 	log.Info("Observed Ingress", "state", *observedIngress)
+	// 	observed.ingress = observedIngress
+	// }
 
 	// StatefulEntities
 	var observedStatefulEntities = new(appsv1.StatefulSetList)

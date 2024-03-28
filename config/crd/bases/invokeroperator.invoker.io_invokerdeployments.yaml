@@ -59,15 +59,13 @@ spec:
                   properties:
                     executorImage:
                       type: string
-                    inputImage:
-                      type: string
                     inputTopic:
                       type: string
                     ioAddress:
                       type: string
-                    name:
+                    ioImage:
                       type: string
-                    outputImage:
+                    name:
                       type: string
                     outputTopic:
                       type: string

@@ -7,15 +7,14 @@ metadata:
     app.kubernetes.io/part-of: invoker-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: invoker-operator
-  name: invokerdeployment-sample
+  name: sample
 spec:
   imagePullPolicy: "IfNotPresent"
   statefulEntities:
-    - executorImage: "ruohang/executor-word-count:testv1"
-      inputImage: "ruohang/iosidecar:testv1"
-      stateImage: "ruohang/statesidecar:testv1"
-      outputImage: "ruohang/producersidecar:testv1"
-      ioAddress: "10.64.212.148:9092"
+    - executorImage: "ruohang/executor-word-count:testv1.1"
+      ioImage: "ruohang/iosidecar:testv1.1"
+      stateImage: "ruohang/statesidecar:testv1.1"
+      ioAddress: "host.docker.internal:9092"
       inputTopic: "test"
       outputTopic: "count"
       name: "word-count"
@@ -24,11 +23,10 @@ spec:
           - "0"
        - partitions:
           - "1"
-    - executorImage: "ruohang/executor-sum:testv1"
-      inputImage: "ruohang/iosidecar:testv1"
-      stateImage: "ruohang/statesidecar:testv1"
-      outputImage: "ruohang/producersidecar:testv1"
-      ioAddress: "10.64.212.148:9092"
+    - executorImage: "ruohang/executor-sum:testv1.1"
+      ioImage: "ruohang/iosidecar:testv1.1"
+      stateImage: "ruohang/statesidecar:testv1.1"
+      ioAddress: "host.docker.internal:9092"
       inputTopic: "count"
       outputTopic: "output"
       name: "sum"

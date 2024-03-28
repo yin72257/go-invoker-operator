@@ -301,11 +301,15 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 										Name:      "config-volume",
 										MountPath: "/etc/config",
 									},
+									{
+										Name:      "uds-volume",
+										MountPath: "/tmp",
+									},
 								},
 							},
 							{
-								Name:            "input-sidecar",
-								Image:           *statefulEntity.InputImage,
+								Name:            "io-sidecar",
+								Image:           *statefulEntity.IOImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Env: []corev1.EnvVar{
 									{
@@ -321,6 +325,10 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 									{
 										Name:      "config-volume",
 										MountPath: "/etc/config",
+									},
+									{
+										Name:      "uds-volume",
+										MountPath: "/tmp",
 									},
 								},
 							},
@@ -328,25 +336,10 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 								Name:            "state-sidecar",
 								Image:           *statefulEntity.StateImage,
 								ImagePullPolicy: corev1.PullIfNotPresent,
-							},
-							{
-								Name:            "producer-sidecar",
-								Image:           *statefulEntity.OutputImage,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Env: []corev1.EnvVar{
-									{
-										Name: "POD_NAME",
-										ValueFrom: &corev1.EnvVarSource{
-											FieldRef: &corev1.ObjectFieldSelector{
-												FieldPath: "metadata.name",
-											},
-										},
-									},
-								},
 								VolumeMounts: []corev1.VolumeMount{
 									{
-										Name:      "config-volume",
-										MountPath: "/etc/config",
+										Name:      "uds-volume",
+										MountPath: "/tmp",
 									},
 								},
 							},
@@ -360,6 +353,12 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 											Name: getConfigMapName(*statefulEntity.Name),
 										},
 									},
+								},
+							},
+							{
+								Name: "uds-volume",
+								VolumeSource: corev1.VolumeSource{
+									EmptyDir: &corev1.EmptyDirVolumeSource{},
 								},
 							},
 						},
