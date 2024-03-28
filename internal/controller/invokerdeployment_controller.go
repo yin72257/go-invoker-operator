@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +33,6 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	invokerv1alpha1 "github.com/yin72257/go-invoker-operator/api/v1alpha1"
-	networkingv1 "k8s.io/api/networking/v1"
 )
 
 var log = ctrllog.Log.WithName("controller_invokerDeployment")
@@ -54,11 +52,11 @@ type InvokerDeploymentReconciler struct {
 }
 
 type DesiredInvokerDeploymentState struct {
-	EntryService     *v1.Service
-	ConfigMaps       []*v1.ConfigMap
-	Secret           *v1.Secret
-	Ingress          *networkingv1.Ingress
-	StatefulEntities []*appsv1.StatefulSet
+	// EntryService     *v1.Service
+	ConfigMaps []*v1.ConfigMap
+	Secret     *v1.Secret
+	// Ingress          *networkingv1.Ingress
+	StatefulEntities []*v1.Pod
 }
 
 type InvokerDeploymentHandler struct {
@@ -83,6 +81,8 @@ type InvokerDeploymentHandler struct {
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get
@@ -116,7 +116,7 @@ func (r *InvokerDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *InvokerDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&invokerv1alpha1.InvokerDeployment{}).
-		Owns(&appsv1.StatefulSet{}).
+		Owns(&v1.Pod{}).
 		Owns(&v1.Service{}).
 		Complete(r)
 }
@@ -237,25 +237,25 @@ func (handler *InvokerDeploymentHandler) reconcile(
 	*desired = getDesiredClusterState(observed, time.Now(), scheme)
 
 	if desired.ConfigMaps != nil {
-		log.Info("Desired state", "ConfigMap", desired.ConfigMaps)
+		// log.Info("Desired state", "ConfigMap", desired.ConfigMaps)
 	} else {
 		log.Info("Desired state", "ConfigMap", "nil")
 	}
 	if desired.Secret != nil {
-		log.Info("Desired state", "Secret", *desired.Secret)
+		// log.Info("Desired state", "Secret", *desired.Secret)
 	} else {
 		log.Info("Desired state", "Secret", "nil")
 	}
-	if desired.EntryService != nil {
-		log.Info("Desired state", "Entry Service", *desired.EntryService)
-	} else {
-		log.Info("Desired state", "Entry Service", "nil")
-	}
-	if desired.Ingress != nil {
-		log.Info("Desired state", "Ingress", *desired.Ingress)
-	} else {
-		log.Info("Desired state", "Ingress", "nil")
-	}
+	// if desired.EntryService != nil {
+	// 	log.Info("Desired state", "Entry Service", *desired.EntryService)
+	// } else {
+	// 	log.Info("Desired state", "Entry Service", "nil")
+	// }
+	// if desired.Ingress != nil {
+	// 	log.Info("Desired state", "Ingress", *desired.Ingress)
+	// } else {
+	// 	log.Info("Desired state", "Ingress", "nil")
+	// }
 
 	log.Info("---------- 4. Take actions ----------")
 

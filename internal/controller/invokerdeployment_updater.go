@@ -11,6 +11,7 @@ import (
 	"github.com/yin72257/go-invoker-operator/api/v1alpha1"
 	controllermetrics "github.com/yin72257/go-invoker-operator/internal/controller/metrics"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,47 +105,55 @@ func (updater *InvokerDeploymentStatusUpdater) deriveInvokerDeploymentStatus(
 	var observedStatefulEntities = observed.statefulEntities
 	totalStatefulEntities := len(observedStatefulEntities)
 	runningSE := 0
-	for _, observedStatefulSet := range observedStatefulEntities {
-		if observedStatefulSet != nil && getStatefulSetState(observedStatefulSet) == v1alpha1.ComponentStateReady {
-			runningSE++
+	for _, observedStatefulEntity := range observedStatefulEntities {
+		if observedStatefulEntity != nil {
+			allReady := true
+			for _, observedPodInSE := range observedStatefulEntity {
+				if getPodState(observedPodInSE) != v1alpha1.ComponentStateReady {
+					allReady = false
+				}
+			}
+			if allReady {
+				runningSE++
+			}
 		}
 	}
 	if runningSE < totalStatefulEntities {
-		status.Components.StatefulSet = v1alpha1.ComponentStateNotReady
+		status.Components.StatefulEntities = v1alpha1.ComponentStateNotReady
 	} else {
-		status.Components.StatefulSet = v1alpha1.ComponentStateReady
+		status.Components.StatefulEntities = v1alpha1.ComponentStateReady
 	}
-	if len(observedStatefulEntities) == 0 && recorded.Components.StatefulSet != "" {
-		status.Components.StatefulSet = v1alpha1.ComponentStateDeleted
+	if len(observedStatefulEntities) == 0 && recorded.Components.StatefulEntities != "" {
+		status.Components.StatefulEntities = v1alpha1.ComponentStateDeleted
 	}
 
 	// Entry service.
-	var observedEntryService = observed.entryService
-	if observedEntryService != nil {
-		var state string
-		if observedEntryService.Spec.ClusterIP != "" {
-			state = v1alpha1.ComponentStateReady
-			runningComponents++
-		}
-		log.Info("Service Ready")
-		status.Components.EntryService = state
-	} else if recorded.Components.EntryService != "" {
-		status.Components.EntryService = v1alpha1.ComponentStateDeleted
-	}
+	// var observedEntryService = observed.entryService
+	// if observedEntryService != nil {
+	// 	var state string
+	// 	if observedEntryService.Spec.ClusterIP != "" {
+	// 		state = v1alpha1.ComponentStateReady
+	// 		runningComponents++
+	// 	}
+	// 	log.Info("Service Ready")
+	// 	status.Components.EntryService = state
+	// } else if recorded.Components.EntryService != "" {
+	// 	status.Components.EntryService = v1alpha1.ComponentStateDeleted
+	// }
 
 	// Ingress.
-	var observedIngress = observed.ingress
-	if observedIngress != nil {
-		var state string
-		if observedIngress.ObjectMeta.Name != "" {
-			state = v1alpha1.ComponentStateReady
-			runningComponents++
-		}
-		log.Info("Ingress Ready")
-		status.Components.Ingress = state
-	} else if recorded.Components.Ingress != "" {
-		status.Components.Ingress = v1alpha1.ComponentStateDeleted
-	}
+	// var observedIngress = observed.ingress
+	// if observedIngress != nil {
+	// 	var state string
+	// 	if observedIngress.ObjectMeta.Name != "" {
+	// 		state = v1alpha1.ComponentStateReady
+	// 		runningComponents++
+	// 	}
+	// 	log.Info("Ingress Ready")
+	// 	status.Components.Ingress = state
+	// } else if recorded.Components.Ingress != "" {
+	// 	status.Components.Ingress = v1alpha1.ComponentStateDeleted
+	// }
 	isClusterStateUpdating := observed.cr.Status.CurrentRevision != observed.cr.Status.NextRevision
 	// Derive the new cluster state.
 	switch recorded.State {
@@ -210,33 +219,33 @@ func (updater *InvokerDeploymentStatusUpdater) isStatusChanged(
 			newStatus.Components.ConfigMap)
 		changed = true
 	}
-	if newStatus.Components.StatefulSet !=
-		currentStatus.Components.StatefulSet {
+	if newStatus.Components.StatefulEntities !=
+		currentStatus.Components.StatefulEntities {
 		updater.log.Info(
-			"InvokerDeployment StatefulSet status changed",
-			"current", currentStatus.Components.StatefulSet,
+			"InvokerDeployment StatefulEntities status changed",
+			"current", currentStatus.Components.StatefulEntities,
 			"new",
-			newStatus.Components.StatefulSet)
+			newStatus.Components.StatefulEntities)
 		changed = true
 	}
-	if newStatus.Components.EntryService !=
-		currentStatus.Components.EntryService {
-		updater.log.Info(
-			"Entry service status changed",
-			"current",
-			currentStatus.Components.EntryService,
-			"new", newStatus.Components.EntryService)
-		changed = true
-	}
-	if newStatus.Components.Ingress !=
-		currentStatus.Components.Ingress {
-		updater.log.Info(
-			"Ingress status changed",
-			"current",
-			currentStatus.Components.Ingress,
-			"new", newStatus.Components.Ingress)
-		changed = true
-	}
+	// if newStatus.Components.EntryService !=
+	// 	currentStatus.Components.EntryService {
+	// 	updater.log.Info(
+	// 		"Entry service status changed",
+	// 		"current",
+	// 		currentStatus.Components.EntryService,
+	// 		"new", newStatus.Components.EntryService)
+	// 	changed = true
+	// }
+	// if newStatus.Components.Ingress !=
+	// 	currentStatus.Components.Ingress {
+	// 	updater.log.Info(
+	// 		"Ingress status changed",
+	// 		"current",
+	// 		currentStatus.Components.Ingress,
+	// 		"new", newStatus.Components.Ingress)
+	// 	changed = true
+	// }
 	return changed
 }
 
@@ -259,6 +268,13 @@ func getDeploymentState(deployment *appsv1.Deployment) string {
 
 func getStatefulSetState(statefulSet *appsv1.StatefulSet) string {
 	if statefulSet.Status.ReadyReplicas >= *statefulSet.Spec.Replicas {
+		return v1alpha1.ComponentStateReady
+	}
+	return v1alpha1.ComponentStateNotReady
+}
+
+func getPodState(pod *corev1.Pod) string {
+	if pod.Status.Phase == corev1.PodRunning {
 		return v1alpha1.ComponentStateReady
 	}
 	return v1alpha1.ComponentStateNotReady
