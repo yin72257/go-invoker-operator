@@ -84,7 +84,7 @@ func (updater *InvokerDeploymentStatusUpdater) deriveInvokerDeploymentStatus(
 	}
 	var runningComponents = 0
 	// InvokerDeploymentDeployment, entryService.
-	var totalComponents = 3
+	var totalComponents = len(observed.cr.Spec.StatefulEntities)
 
 	// ConfigMap.
 	var observedConfigMap = observed.configMaps
@@ -115,6 +115,7 @@ func (updater *InvokerDeploymentStatusUpdater) deriveInvokerDeploymentStatus(
 			}
 			if allReady {
 				runningSE++
+				runningComponents++
 			}
 		}
 	}
@@ -123,9 +124,9 @@ func (updater *InvokerDeploymentStatusUpdater) deriveInvokerDeploymentStatus(
 	} else {
 		status.Components.StatefulEntities = v1alpha1.ComponentStateReady
 	}
-	if len(observedStatefulEntities) == 0 && recorded.Components.StatefulEntities != "" {
-		status.Components.StatefulEntities = v1alpha1.ComponentStateDeleted
-	}
+	// if len(observedStatefulEntities) == 0 && recorded.Components.StatefulEntities != "" {
+	// 	status.Components.StatefulEntities = v1alpha1.ComponentStateDeleted
+	// }
 
 	// Entry service.
 	// var observedEntryService = observed.entryService
