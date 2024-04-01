@@ -2,8 +2,27 @@
 // TODO(user): Add simple overview of use/purpose
 
 ## Description
-
 ## Quick Setup
+
+### Setting up Kube Prometheus Stack
+Using Kube prometheus stack helm charts to setup basic prometheus:
+https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+
+```shell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+```
+
+Expose Prometheus endpoint via Port forwarding
+```shell
+kubectl port-forward svc/prometheus-operated 9090:9090
+```
+
+Access Prometheus dashboard via https://localhost:9090
+
+### Setting up operator
 This setup assumes you have a Kubernetes cluster set up with correct permissions and network that can reach public internet.
 
 1. Depending on your kubernetes CLI command, change in Makefile line 187 to `KUBECTL ?= {kubectl command}`.
