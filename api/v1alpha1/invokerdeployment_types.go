@@ -42,7 +42,7 @@ type PodConfig struct {
 	Partitions []string `json:"partitions,omitempty"`
 	// Configuration used for InvokerDeployment
 	// +optional
-	Resource v1.ResourceRequirements `json:"resource,omitempty"`
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type StatefulEntity struct {
@@ -87,13 +87,9 @@ type InvokerDeploymentSpec struct {
 type ComponentsStatus struct {
 	ConfigMap string `json:"configMap"`
 
-	StatefulSet string `json:"statefulSet"`
-
-	EntryService string `json:"entryService"`
+	StatefulEntities string `json:"statefulEntities"`
 
 	Secret string `json:"secret"`
-
-	Ingress string `json:"ingress"`
 }
 
 // InvokerDeploymentStatus defines the observed state of InvokerDeployment

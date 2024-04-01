@@ -26,16 +26,16 @@ type InvokerDeploymentStateObserver struct {
 
 // ObservedInvokerDeploymentState holds observed state of a cluster.
 type ObservedInvokerDeploymentState struct {
-	cr                           *invokerv1alpha1.InvokerDeployment
-	revisions                    []*appsv1.ControllerRevision
-	configMaps                   map[string]*corev1.ConfigMap
-	invokerDeploymentStatefulSet *appsv1.StatefulSet
-	secret                       *corev1.Secret
-	observeTime                  time.Time
-	entryService                 *corev1.Service
-	statefulSetService           *corev1.Service
-	ingress                      *networkingv1.Ingress
-	statefulEntities             map[string]*appsv1.StatefulSet
+	cr         *invokerv1alpha1.InvokerDeployment
+	revisions  []*appsv1.ControllerRevision
+	configMaps map[string]*corev1.ConfigMap
+	// invokerDeploymentStatefulSet *appsv1.StatefulSet
+	secret      *corev1.Secret
+	observeTime time.Time
+	// entryService                 *corev1.Service
+	// statefulSetService           *corev1.Service
+	// ingress                      *networkingv1.Ingress
+	statefulEntities map[string]map[string]*corev1.Pod
 }
 
 type InvokerDeploymentStatus struct {
@@ -58,7 +58,7 @@ func (observer *InvokerDeploymentStateObserver) observe(
 		log.Info("Observed invokerDeployment", "invokerDeployment", "nil")
 		observedCR = nil
 	} else {
-		log.Info("Observed invokerDeployment", "invokerDeployment", *observedCR)
+		//log.Info("Observed invokerDeployment", "invokerDeployment", *observedCR)
 		observed.cr = observedCR
 	}
 	if observed.cr == nil {
@@ -76,7 +76,7 @@ func (observer *InvokerDeploymentStateObserver) observe(
 		log.Info("Observed secret", "state", "nil")
 		observedSecret = nil
 	} else {
-		log.Info("Observed configMap", "state", *observedSecret)
+		// log.Info("Observed secret", "state", *observedSecret)
 		observed.secret = observedSecret
 	}
 
@@ -92,7 +92,7 @@ func (observer *InvokerDeploymentStateObserver) observe(
 		observedConfigMaps = nil
 	} else {
 		observed.configMaps = make(map[string]*corev1.ConfigMap)
-		log.Info("Observed configMaps", "state", *observedConfigMaps)
+		// log.Info("Observed configMaps", "state", *observedConfigMaps)
 		for i := range observedConfigMaps.Items {
 			observed.configMaps[observedConfigMaps.Items[i].Name] = &observedConfigMaps.Items[i]
 		}
@@ -159,7 +159,7 @@ func (observer *InvokerDeploymentStateObserver) observe(
 	// }
 
 	// StatefulEntities
-	var observedStatefulEntities = new(appsv1.StatefulSetList)
+	var observedStatefulEntities = new(corev1.PodList)
 	err = observer.observeStatefulEntities(observedStatefulEntities)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
@@ -169,10 +169,14 @@ func (observer *InvokerDeploymentStateObserver) observe(
 		log.Info("Observed list SE", "state", "nil")
 		observedStatefulEntities = nil
 	} else {
-		log.Info("Observed SE", "state", *observedStatefulEntities)
-		observed.statefulEntities = make(map[string]*appsv1.StatefulSet)
+		//log.Info("Observed SE", "state", *observedStatefulEntities)
+		observed.statefulEntities = make(map[string]map[string]*corev1.Pod)
 		for i := range observedStatefulEntities.Items {
-			observed.statefulEntities[observedStatefulEntities.Items[i].Name] = &observedStatefulEntities.Items[i]
+			observedPod := observedStatefulEntities.Items[i]
+			if observed.statefulEntities[observedPod.Labels["statefulEntityName"]] == nil {
+				observed.statefulEntities[observedPod.Labels["statefulEntityName"]] = make(map[string]*corev1.Pod)
+			}
+			observed.statefulEntities[observedPod.Labels["statefulEntityName"]][observedPod.Name] = &observedPod
 		}
 	}
 
@@ -318,7 +322,7 @@ func (observer *InvokerDeploymentStateObserver) observeIngress(
 		observedIngress)
 }
 
-func (observer *InvokerDeploymentStateObserver) observeStatefulEntities(observedStatefulEntities *appsv1.StatefulSetList) error {
+func (observer *InvokerDeploymentStateObserver) observeStatefulEntities(observedStatefulEntities *corev1.PodList) error {
 	var namespace = observer.request.Namespace
 	labelSelector := client.MatchingLabels{"type": "statefulEntity"}
 	if err := observer.k8sClient.List(observer.context, observedStatefulEntities, labelSelector, client.InNamespace(namespace)); err != nil {

@@ -28,10 +28,10 @@ func getDesiredClusterState(
 		return DesiredInvokerDeploymentState{}
 	}
 	return DesiredInvokerDeploymentState{
-		ConfigMaps:       getDesiredConfigMaps(invokerDeployment, scheme),
-		Secret:           getDesiredSecret(invokerDeployment, scheme),
-		EntryService:     getDesiredEntryService(invokerDeployment, scheme),
-		Ingress:          getDesiredIngress(invokerDeployment, scheme),
+		ConfigMaps: getDesiredConfigMaps(invokerDeployment, scheme),
+		Secret:     getDesiredSecret(invokerDeployment, scheme),
+		// EntryService:     getDesiredEntryService(invokerDeployment, scheme),
+		// Ingress:          getDesiredIngress(invokerDeployment, scheme),
 		StatefulEntities: getDesiredStatefulEntities(invokerDeployment, scheme),
 	}
 }
@@ -52,8 +52,8 @@ input.topic=%s
 output.topic=%s
 `, *statefulEntity.IOAddress, *statefulEntity.InputTopic, *statefulEntity.OutputTopic),
 		}
-		for index, podConfig := range statefulEntity.Pods {
-			key := fmt.Sprintf(`%s-%d.partitions`, *statefulEntity.Name, index)
+		for _, podConfig := range statefulEntity.Pods {
+			key := fmt.Sprintf(`%s.partitions`, *podConfig.Name)
 			value := strings.Join(podConfig.Partitions, ",")
 			data[key] = value
 		}
@@ -267,108 +267,101 @@ func getDesiredStatefulSet(
 	return statefulSet
 }
 
-func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) []*appsv1.StatefulSet {
-	labels := labels(instance)
-	labels["type"] = "statefulEntity"
-	seList := []*appsv1.StatefulSet{}
+func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *runtime.Scheme) []*corev1.Pod {
+
+	podList := []*corev1.Pod{}
 
 	for _, statefulEntity := range instance.Spec.StatefulEntities {
-		replicas := int32(len(statefulEntity.Pods))
-		statefulSet := &appsv1.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      *statefulEntity.Name,
-				Namespace: instance.ObjectMeta.Namespace,
-				Labels:    labels,
-			},
-			Spec: appsv1.StatefulSetSpec{
-				ServiceName: "",
-				Replicas:    &replicas,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: labels,
+		labels := labels(instance)
+		labels["type"] = "statefulEntity"
+		labels["statefulEntityName"] = *statefulEntity.Name
+		for _, podConfig := range statefulEntity.Pods {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      *podConfig.Name,
+					Namespace: instance.ObjectMeta.Namespace,
+					Labels:    labels,
 				},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: labels,
-					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:            "invoker-pod",
-								Image:           *statefulEntity.ExecutorImage,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "config-volume",
-										MountPath: "/etc/config",
-									},
-									{
-										Name:      "uds-volume",
-										MountPath: "/tmp",
-									},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "executor-pod",
+							Image:           *statefulEntity.ExecutorImage,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config-volume",
+									MountPath: "/etc/config",
+								},
+								{
+									Name:      "uds-volume",
+									MountPath: "/tmp",
 								},
 							},
-							{
-								Name:            "io-sidecar",
-								Image:           *statefulEntity.IOImage,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Env: []corev1.EnvVar{
-									{
-										Name: "POD_NAME",
-										ValueFrom: &corev1.EnvVarSource{
-											FieldRef: &corev1.ObjectFieldSelector{
-												FieldPath: "metadata.name",
-											},
-										},
-									},
-								},
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "config-volume",
-										MountPath: "/etc/config",
-									},
-									{
-										Name:      "uds-volume",
-										MountPath: "/tmp",
-									},
-								},
-							},
-							{
-								Name:            "state-sidecar",
-								Image:           *statefulEntity.StateImage,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								VolumeMounts: []corev1.VolumeMount{
-									{
-										Name:      "uds-volume",
-										MountPath: "/tmp",
-									},
-								},
-							},
+							Resources: podConfig.Resources,
 						},
-						Volumes: []corev1.Volume{
-							{
-								Name: "config-volume",
-								VolumeSource: corev1.VolumeSource{
-									ConfigMap: &corev1.ConfigMapVolumeSource{
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: getConfigMapName(*statefulEntity.Name),
+						{
+							Name:            "io-sidecar",
+							Image:           *statefulEntity.IOImage,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env: []corev1.EnvVar{
+								{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
 										},
 									},
 								},
 							},
-							{
-								Name: "uds-volume",
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config-volume",
+									MountPath: "/etc/config",
+								},
+								{
+									Name:      "uds-volume",
+									MountPath: "/tmp",
+								},
+							},
+						},
+						{
+							Name:            "state-sidecar",
+							Image:           *statefulEntity.StateImage,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "uds-volume",
+									MountPath: "/tmp",
 								},
 							},
 						},
 					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: getConfigMapName(*statefulEntity.Name),
+									},
+								},
+							},
+						},
+						{
+							Name: "uds-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
 				},
-			},
+			}
+
+			controllerutil.SetControllerReference(instance, pod, scheme)
+			podList = append(podList, pod)
 		}
-		controllerutil.SetControllerReference(instance, statefulSet, scheme)
-		seList = append(seList, statefulSet)
 
 	}
-	return seList
+	return podList
 }

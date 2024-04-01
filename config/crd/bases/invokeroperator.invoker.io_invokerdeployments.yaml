@@ -73,11 +73,13 @@ spec:
                       description: 'Default: 1'
                       items:
                         properties:
+                          name:
+                            type: string
                           partitions:
                             items:
                               type: string
                             type: array
-                          resource:
+                          resources:
                             description: Configuration used for InvokerDeployment
                             properties:
                               claims:
@@ -147,20 +149,14 @@ spec:
                 properties:
                   configMap:
                     type: string
-                  entryService:
-                    type: string
-                  ingress:
-                    type: string
                   secret:
                     type: string
-                  statefulSet:
+                  statefulEntities:
                     type: string
                 required:
                 - configMap
-                - entryService
-                - ingress
                 - secret
-                - statefulSet
+                - statefulEntities
                 type: object
               conditions:
                 description: Conditions of the instances

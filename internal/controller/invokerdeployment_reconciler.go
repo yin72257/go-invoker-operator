@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -62,20 +63,28 @@ func (reconciler *InvokerDeploymentResourceReconciler) reconcile() (ctrl.Result,
 		}
 	}
 
-	statefulEntityDesired := make(map[string]bool)
-	for _, desiredSE := range reconciler.desired.StatefulEntities {
-		observedSE := reconciler.observed.statefulEntities[desiredSE.Name]
-		statefulEntityDesired[desiredSE.Name] = true
-		err = reconciler.reconcileStatefulSet(desiredSE, observedSE)
+	podDesired := make(map[string]bool)
+	for _, desiredPod := range reconciler.desired.StatefulEntities {
+		seName := desiredPod.Labels["statefulEntityName"]
+		observedSE := reconciler.observed.statefulEntities[seName]
+		var observedPod *corev1.Pod
+		if observedSE != nil {
+			observedPod = observedSE[desiredPod.Name]
+		}
+		podDesired[desiredPod.Name] = true
+		err = reconciler.reconcilePod("statefulEntity "+seName+" pod "+desiredPod.Name, desiredPod, observedPod)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}
-	for name, observedSE := range reconciler.observed.statefulEntities {
-		if _, exist := statefulEntityDesired[name]; !exist {
-			err = reconciler.reconcileStatefulSet(nil, observedSE)
-			if err != nil {
-				return ctrl.Result{}, err
+	for _, observedSE := range reconciler.observed.statefulEntities {
+		for _, pod := range observedSE {
+			log.Info("Pod Observed", "Pod", pod.Name, "Exists", podDesired[pod.Name])
+			if _, exist := podDesired[pod.Name]; !exist {
+				err = reconciler.reconcilePod("pod", nil, pod)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
 			}
 		}
 	}
@@ -254,12 +263,12 @@ func (reconciler *InvokerDeploymentResourceReconciler) deleteDeployment(
 	return err
 }
 
-func (reconciler *InvokerDeploymentResourceReconciler) reconcileEntryService() error {
-	return reconciler.reconcileService(
-		"EntryService",
-		reconciler.desired.EntryService,
-		reconciler.observed.entryService)
-}
+// func (reconciler *InvokerDeploymentResourceReconciler) reconcileEntryService() error {
+// 	return reconciler.reconcileService(
+// 		"EntryService",
+// 		reconciler.desired.EntryService,
+// 		reconciler.observed.entryService)
+// }
 
 func (reconciler *InvokerDeploymentResourceReconciler) reconcileService(component string,
 	desiredService *corev1.Service,
@@ -431,32 +440,32 @@ func (reconciler *InvokerDeploymentResourceReconciler) deleteSecret(
 	return err
 }
 
-func (reconciler *InvokerDeploymentResourceReconciler) reconcileIngress() error {
-	var desiredIngress = reconciler.desired.Ingress
-	var observedIngress = reconciler.observed.ingress
+// func (reconciler *InvokerDeploymentResourceReconciler) reconcileIngress() error {
+// 	var desiredIngress = reconciler.desired.Ingress
+// 	var observedIngress = reconciler.observed.ingress
 
-	if desiredIngress != nil && observedIngress == nil {
-		return reconciler.createIngress(desiredIngress, "Ingress")
-	}
+// 	if desiredIngress != nil && observedIngress == nil {
+// 		return reconciler.createIngress(desiredIngress, "Ingress")
+// 	}
 
-	if desiredIngress != nil && observedIngress != nil {
-		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
-			err := reconciler.updateComponent(desiredIngress, "Ingress")
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		reconciler.log.Info("Ingress already exists, no action")
-		return nil
-	}
+// 	if desiredIngress != nil && observedIngress != nil {
+// 		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
+// 			err := reconciler.updateComponent(desiredIngress, "Ingress")
+// 			if err != nil {
+// 				return err
+// 			}
+// 			return nil
+// 		}
+// 		reconciler.log.Info("Ingress already exists, no action")
+// 		return nil
+// 	}
 
-	if desiredIngress == nil && observedIngress != nil {
-		return reconciler.deleteIngress(observedIngress, "Entry")
-	}
+// 	if desiredIngress == nil && observedIngress != nil {
+// 		return reconciler.deleteIngress(observedIngress, "Entry")
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (reconciler *InvokerDeploymentResourceReconciler) createIngress(
 	ingress *networkingv1.Ingress, component string) error {
@@ -523,8 +532,10 @@ func (reconciler *InvokerDeploymentResourceReconciler) reconcilePod(
 	}
 
 	if desiredPod != nil && observedPod != nil {
-		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision {
-			err := reconciler.updateComponent(desiredPod, "Pod")
+		if reconciler.observed.cr.Status.CurrentRevision != reconciler.observed.cr.Status.NextRevision &&
+			needToRestartPod(desiredPod, observedPod) {
+			log.Info("Deleting Pod", "Desired", desiredPod.Spec, "Observed", observedPod.Spec)
+			err := reconciler.deletePod(desiredPod, "Pod")
 			if err != nil {
 				return err
 			}
@@ -539,6 +550,18 @@ func (reconciler *InvokerDeploymentResourceReconciler) reconcilePod(
 	}
 
 	return nil
+}
+
+func needToRestartPod(desiredPod *corev1.Pod, observedPod *corev1.Pod) bool {
+	desiredPodResources := make(map[string]corev1.ResourceRequirements)
+	observedPodResources := make(map[string]corev1.ResourceRequirements)
+	for _, container := range desiredPod.Spec.Containers {
+		desiredPodResources[container.Name] = container.Resources
+	}
+	for _, container := range observedPod.Spec.Containers {
+		observedPodResources[container.Name] = container.Resources
+	}
+	return !reflect.DeepEqual(desiredPodResources, observedPodResources)
 }
 
 func (reconciler *InvokerDeploymentResourceReconciler) createPod(
@@ -563,7 +586,6 @@ func (reconciler *InvokerDeploymentResourceReconciler) deletePod(
 	var log = reconciler.log.WithValues("component", component)
 	var k8sClient = reconciler.k8sClient
 
-	log.Info("Deleting Pod", "Pod", pod)
 	var err = k8sClient.Delete(context, pod)
 	err = client.IgnoreNotFound(err)
 	if err != nil {

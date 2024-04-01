@@ -19,10 +19,26 @@ spec:
       outputTopic: "count"
       name: "word-count"
       pods:
-       - partitions:
+       - name: "word-count-0"
+         partitions:
           - "0"
-       - partitions:
-          - "1"
+         resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+      #  - name: "word-count-1"
+      #    partitions:
+      #     - "1"
+      #    resources:
+      #     requests:
+      #       memory: "64Mi"
+      #       cpu: "250m"
+      #     limits:
+      #       memory: "256Mi"
+      #       cpu: "500m"
     - executorImage: "ruohang/executor-sum:testv1.1"
       ioImage: "ruohang/iosidecar:testv1.1"
       stateImage: "ruohang/statesidecar:testv1.1"
@@ -31,7 +47,8 @@ spec:
       outputTopic: "output"
       name: "sum"
       pods:
-       - partitions:
+       - name: "sum-0"
+         partitions:
           - "0"
   version: "testv1"
   historyLimit: 3
