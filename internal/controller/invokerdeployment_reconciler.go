@@ -501,6 +501,9 @@ func (reconciler *InvokerDeploymentResourceReconciler) deleteIngress(
 }
 
 func (reconciler *InvokerDeploymentResourceReconciler) cleanupOldRevisions() error {
+	if reconciler.observed.cr == nil {
+		return nil
+	}
 	revisions := reconciler.observed.revisions
 	if len(revisions) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
 		return nil // Nothing to do
@@ -556,9 +559,15 @@ func needToRestartPod(desiredPod *corev1.Pod, observedPod *corev1.Pod) bool {
 	desiredPodResources := make(map[string]corev1.ResourceRequirements)
 	observedPodResources := make(map[string]corev1.ResourceRequirements)
 	for _, container := range desiredPod.Spec.Containers {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = container.Resources.Limits
+		}
 		desiredPodResources[container.Name] = container.Resources
 	}
 	for _, container := range observedPod.Spec.Containers {
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = container.Resources.Limits
+		}
 		observedPodResources[container.Name] = container.Resources
 	}
 	return !reflect.DeepEqual(desiredPodResources, observedPodResources)

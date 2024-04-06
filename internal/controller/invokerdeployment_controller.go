@@ -23,7 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 
@@ -145,76 +144,75 @@ func (handler *InvokerDeploymentHandler) reconcile(
 		log.Error(err, "Failed to observe the current state")
 		return ctrl.Result{}, err
 	}
-	if observed.cr == nil {
-		log.Info("The resource has been deleted")
-		return ctrl.Result{}, nil
-	}
-
-	if !controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
-		log.Info("Adding finalizer for invokerDeployment")
-		if ok := controllerutil.AddFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
-			log.Error(err, "Failed to add finalizer")
-			return ctrl.Result{}, nil
-		}
-		if err := k8sClient.Update(context, observed.cr); err != nil {
-			log.Error(err, "Failed to add finalizer to CR")
-			return ctrl.Result{}, err
-		}
-	}
 
 	log.Info("---------- 2. Update invokerDeployment status ----------")
 
+	if observed.cr != nil {
+		if !controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
+			log.Info("Adding finalizer for invokerDeployment")
+			if ok := controllerutil.AddFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
+				log.Error(err, "Failed to add finalizer")
+				return ctrl.Result{}, nil
+			}
+			if err := k8sClient.Update(context, observed.cr); err != nil {
+				log.Error(err, "Failed to add finalizer to CR")
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
+		if observed.cr.GetDeletionTimestamp() != nil {
+			if controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
+				// if err = updater.updateCondition(&metav1.Condition{
+				// 	Type:    typeDegraded,
+				// 	Status:  metav1.ConditionUnknown,
+				// 	Reason:  "Finalizing",
+				// 	Message: "Performing finalizing operations"}); err != nil {
+				// 	log.Error(err, "Failed to update status")
+				// 	return ctrl.Result{}, err
+				// }
+
+				handler.doFinalizeOperation()
+
+				// if err = observer.observe(observed); err != nil {
+				// 	log.Error(err, "Failed to re-fetch InvokerDeployment")
+				// 	return ctrl.Result{}, err
+				// }
+
+				// updater.observed = *observed
+				// if err = updater.updateCondition(&metav1.Condition{
+				// 	Type:    typeDegraded,
+				// 	Status:  metav1.ConditionUnknown,
+				// 	Reason:  "Finalizing",
+				// 	Message: "Finished performing finalizing operations"}); err != nil {
+				// 	log.Error(err, "Failed to update status")
+				// 	return ctrl.Result{}, err
+				// }
+
+				// if err = observer.observe(observed); err != nil {
+				// 	log.Error(err, "Failed to re-fetch InvokerDeployment")
+				// 	return ctrl.Result{}, err
+				// }
+
+				log.Info("Removing Finalizer after successful operation")
+				if ok := controllerutil.RemoveFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
+					log.Error(err, "Failed to remove finalizer")
+					return ctrl.Result{Requeue: true}, nil
+				}
+
+				if err := k8sClient.Update(context, observed.cr); err != nil {
+					log.Error(err, "Failed to remove finalizer on update")
+					return ctrl.Result{}, err
+				}
+			}
+			log.Info("CR Marked as to be deleted")
+			return ctrl.Result{}, nil
+		}
+	}
 	var updater = InvokerDeploymentStatusUpdater{
 		k8sClient: k8sClient,
 		context:   context,
 		log:       log,
-		observed:  handler.observed,
-	}
-	if observed.cr.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(observed.cr, invokerDeploymentFinalizer) {
-			if err = updater.updateCondition(&metav1.Condition{
-				Type:    typeDegraded,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Finalizing",
-				Message: "Performing finalizing operations"}); err != nil {
-				log.Error(err, "Failed to update status")
-				return ctrl.Result{}, err
-			}
-
-			handler.doFinalizeOperation()
-
-			if err = observer.observe(observed); err != nil {
-				log.Error(err, "Failed to re-fetch InvokerDeployment")
-				return ctrl.Result{}, err
-			}
-
-			if err = updater.updateCondition(&metav1.Condition{
-				Type:    typeDegraded,
-				Status:  metav1.ConditionUnknown,
-				Reason:  "Finalizing",
-				Message: "Finished performing finalizing operations"}); err != nil {
-				log.Error(err, "Failed to update status")
-				return ctrl.Result{}, err
-			}
-
-			if err = observer.observe(observed); err != nil {
-				log.Error(err, "Failed to re-fetch InvokerDeployment")
-				return ctrl.Result{}, err
-			}
-
-			log.Info("Removing Finalizer after successful operation")
-			if ok := controllerutil.RemoveFinalizer(observed.cr, invokerDeploymentFinalizer); !ok {
-				log.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{Requeue: true}, nil
-			}
-
-			if err := k8sClient.Update(context, observed.cr); err != nil {
-				log.Error(err, "Failed to remove finalizer on update")
-				return ctrl.Result{}, err
-			}
-		}
-		log.Info("CR Marked as to be deleted")
-		return ctrl.Result{}, nil
+		observed:  *observed,
 	}
 
 	statusChanged, err = updater.updateStatusIfChanged()

@@ -11,7 +11,7 @@ metadata:
     app.kubernetes.io/created-by: invoker-operator
     app.kubernetes.io/part-of: invoker-operator
     app.kubernetes.io/managed-by: kustomize
-    release: prometheus
+    release: kube-prometheus-stack
   name: controller-manager-metrics-monitor
   namespace: system
 spec:

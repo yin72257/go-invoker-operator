@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: invoker-operator
   name: sample
+  namespace: test
 spec:
   imagePullPolicy: "IfNotPresent"
   statefulEntities:
@@ -15,20 +16,13 @@ spec:
       ioImage: "ruohang/iosidecar:testv1.1"
       stateImage: "ruohang/statesidecar:testv1.1"
       ioAddress: "host.docker.internal:9092"
-      inputTopic: "test"
+      inputTopic: "input"
       outputTopic: "count"
       name: "word-count"
       pods:
-       - name: "word-count-1"
+       - name: "word-count-0"
          partitions:
-          - "1"
-         resources:
-          requests:
-            memory: "64Mi"
-            cpu: "250m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
+          - "0,1,2,3,4,5"
     - executorImage: "ruohang/executor-sum:testv1.1"
       ioImage: "ruohang/iosidecar:testv1.1"
       stateImage: "ruohang/statesidecar:testv1.1"
@@ -40,11 +34,6 @@ spec:
        - name: "sum-0"
          partitions:
           - "0"
-         resources:
-          requests:
-            cpu: "250m"
-          limits:
-            cpu: "250m"
   version: "testv1"
   historyLimit: 3
 
