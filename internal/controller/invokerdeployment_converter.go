@@ -314,6 +314,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 									},
 								},
 							},
+							Resources: podConfig.Resources,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config-volume",

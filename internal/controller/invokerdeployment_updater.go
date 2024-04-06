@@ -286,6 +286,9 @@ func timeToString(timestamp time.Time) string {
 }
 
 func (updater *InvokerDeploymentStatusUpdater) syncRevisions(observed *ObservedInvokerDeploymentState) error {
+	if observed.cr == nil {
+		return nil
+	}
 	if observed.cr.Status.CurrentRevision == "" {
 		return updater.createControllerRevision(observed, 1)
 	}

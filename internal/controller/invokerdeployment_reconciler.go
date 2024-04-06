@@ -501,6 +501,9 @@ func (reconciler *InvokerDeploymentResourceReconciler) deleteIngress(
 }
 
 func (reconciler *InvokerDeploymentResourceReconciler) cleanupOldRevisions() error {
+	if reconciler.observed.cr == nil {
+		return nil
+	}
 	revisions := reconciler.observed.revisions
 	if len(revisions) <= int(*reconciler.observed.cr.Spec.HistoryLimit) {
 		return nil // Nothing to do
