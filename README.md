@@ -26,7 +26,7 @@ Access Prometheus dashboard via https://localhost:9090
 This setup assumes you have a Kubernetes cluster set up with correct permissions and network that can reach public internet.
 
 1. Depending on your kubernetes CLI command, change in Makefile line 187 to `KUBECTL ?= {kubectl command}`.
-Eg. For Microk8s you may change it to `KUBECTL ?= microk8s kubectl`. 
+Eg. For Microk8s you may change it to `KUBECTL ?= microk8s kubectl`. For Minikube use `KUBECTL ?= minikube kubectl --`
 
 2. Run and ensure the operator deployment is running on the kubernetes cluster.
 ```shell
@@ -36,7 +36,61 @@ make deploy
 kubectl wait --for=condition=available deployment/invoker-operator-controller-manager
 ```
 
-3. After the operator pods are running. Apply the custom resource yamls. The example is located in `config/samples`. 
+You can now apply custom InvokerDeployments onto the cluster.
+
+## Setting up Dependencies to run Word Count
+
+### Setting up Kafka
+
+First you need to set up a Kafka Cluster reachable by Kubernetes plane. This can be in localhost.
+
+1. Get Kafka. Step 1 of [Quickstart Guide](https://kafka.apache.org/quickstart).
+2. Start Zookeeper
+```shell
+bin/zookeeper-server-start.sh config/zookeeper.properties
+```
+3. Change `config/server.properties` field `advertised.listeners` to your network public ip
+```el
+advertised.listeners=PLAINTEXT://YOUR_PUBLIC_IP:9092
+```
+4. Start Kafka Broker
+```shell
+bin/kafka-server-start.sh config/server.properties
+```
+5. Create input and output topic: These must match the input and output topics configured in the InvokerDeployment YAML.
+```shell
+bin/kafka-topics.sh --create --topic test --bootstrap-server localhost:9092 --partitions 6
+bin/kafka-topics.sh --create --topic count --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic output --bootstrap-server localhost:9092
+```
+
+6. Create cli producer for input topic or use a Kafka application.
+```shell
+bin/kafka-console-producer.sh --topic test --bootstrap-server localhost:9092
+# add flags --property "parse.key=true" --property "key.separator=:" to send key with key:value
+```
+
+7. Create consumer for output topic
+```shell
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092  --topic output  --formatter kafka.tools.DefaultMessageFormatter --property print.key=true  --property print.value=true
+```
+
+### Finding the localhost ip for Kafka broker
+To connect the kubernetes pod to Kafka, the `kafka.broker` address in the config.yaml must be setup correctly.
+This section details what you need to do if your Kafka broker is running on `localhost:9092`.
+If Kafka is already setup in another IP reachable from the K8S cluster, replacing `kafka.broker` value will be enough.
+
+Kind exposes localhost of your machine same way as docker: using `host.docker.internal`.
+
+In Minikube and Microk8s the process is more complicated.
+#### On MacOS
+Use ifconfig to find the localhost ip for your host machine.
+```shell
+ifconfig
+```
+Under `en0`, the ipv4 address next to the `inet` row should be usable.
+
+. After the operator pods are running. Apply the custom resource yamls. The example is located in `config/samples`. 
 ```
 kubectl apply -f config/samples/invokeroperator_v1alpha1_invokerdeployment.yaml
 ``` 
