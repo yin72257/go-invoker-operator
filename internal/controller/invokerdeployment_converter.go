@@ -287,7 +287,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 						{
 							Name:            "executor-pod",
 							Image:           *statefulEntity.ExecutorImage,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: instance.Spec.ImagePullPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config-volume",
@@ -303,7 +303,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 						{
 							Name:            "io-sidecar",
 							Image:           *statefulEntity.IOImage,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: instance.Spec.ImagePullPolicy,
 							Env: []corev1.EnvVar{
 								{
 									Name: "POD_NAME",
@@ -329,7 +329,7 @@ func getDesiredStatefulEntities(instance *v1alpha1.InvokerDeployment, scheme *ru
 						{
 							Name:            "state-sidecar",
 							Image:           *statefulEntity.StateImage,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: instance.Spec.ImagePullPolicy,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "uds-volume",
