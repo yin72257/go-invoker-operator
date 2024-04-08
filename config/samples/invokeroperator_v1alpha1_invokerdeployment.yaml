@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: invoker-operator
   name: sample
 spec:
-  imagePullPolicy: "IfNotPresent"
+  imagePullPolicy: "Always"
   statefulEntities:
     - executorImage: "ruohang/executor-word-count:testv1.1"
       ioImage: "ruohang/iosidecar:testv1.1"
